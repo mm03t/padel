@@ -1,0 +1,70 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: academia_db
+    restart: unless-stopped
+    ports:
+      - "5434:5432"
+    environment:
+      POSTGRES_USER: academia
+      POSTGRES_PASSWORD: academia123
+      POSTGRES_DB: academia
+    volumes:
+      - academia_pgdata:/var/lib/postgresql/data
+    networks:
+      - academia_net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U academia"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: academia_backend
+    restart: unless-stopped
+    ports:
+      - "3003:3003"
+    environment:
+      DATABASE_URL: postgresql://academia:academia123@db:5432/academia
+      JWT_SECRET: academia_jwt_secret_2026
+      PORT: "3003"
+      NODE_ENV: development
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - academia_net
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: academia_frontend
+    restart: unless-stopped
+    ports:
+      - "3002:3000"
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:3003
+    depends_on:
+      - backend
+    networks:
+      - academia_net
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+      - /app/.next
+
+networks:
+  academia_net:
+    driver: bridge
+
+volumes:
+  academia_pgdata:

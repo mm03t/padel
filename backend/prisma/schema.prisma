@@ -1,0 +1,231 @@
+// Prisma schema — Academia de Pádel
+// https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─────────────────────────────────────────
+//  MODELOS PRINCIPALES
+// ─────────────────────────────────────────
+
+model Alumno {
+  id             String         @id @default(cuid())
+  nombre         String
+  apellidos      String
+  email          String         @unique
+  telefono       String
+  nivel          Float          // 1.0 · 1.5 · 2.0 · 2.5 · 3.0 · 3.5 · 4.0
+  disponibilidad Disponibilidad @default(FLEXIBLE)
+  activo         Boolean        @default(true)
+  notas          String?
+  createdAt      DateTime       @default(now()) @map("created_at")
+  updatedAt      DateTime       @updatedAt @map("updated_at")
+
+  inscripciones  AlumnoClase[]
+  asistencias    Asistencia[]
+  recuperaciones Recuperacion[]
+  notificaciones Notificacion[]
+
+  @@map("alumnos")
+}
+
+model Profesor {
+  id        String   @id @default(cuid())
+  nombre    String
+  apellidos String
+  email     String   @unique
+  telefono  String?
+  activo    Boolean  @default(true)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  clases Clase[]
+
+  @@map("profesores")
+}
+
+model Pista {
+  id     String  @id @default(cuid())
+  nombre String
+  numero Int     @unique
+  activa Boolean @default(true)
+
+  clases Clase[]
+
+  @@map("pistas")
+}
+
+model Clase {
+  id          String    @id @default(cuid())
+  nombre      String
+  nivelMin    Float     @map("nivel_min")
+  nivelMax    Float     @map("nivel_max")
+  profesorId  String    @map("profesor_id")
+  pistaId     String    @map("pista_id")
+  diaSemana   DiaSemana @map("dia_semana")
+  horaInicio  String    @map("hora_inicio") // "09:00"
+  horaFin     String    @map("hora_fin")    // "10:00"
+  plazasTotal Int       @default(4) @map("plazas_total")
+  activa      Boolean   @default(true)
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  profesor      Profesor    @relation(fields: [profesorId], references: [id])
+  pista         Pista       @relation(fields: [pistaId], references: [id])
+  inscripciones AlumnoClase[]
+  sesiones      Sesion[]
+
+  @@map("clases")
+}
+
+model AlumnoClase {
+  id          String   @id @default(cuid())
+  alumnoId    String   @map("alumno_id")
+  claseId     String   @map("clase_id")
+  fechaInicio DateTime @default(now()) @map("fecha_inicio")
+  activo      Boolean  @default(true)
+
+  alumno Alumno @relation(fields: [alumnoId], references: [id])
+  clase  Clase  @relation(fields: [claseId], references: [id])
+
+  @@unique([alumnoId, claseId])
+  @@map("alumno_clases")
+}
+
+model Sesion {
+  id        String       @id @default(cuid())
+  claseId   String       @map("clase_id")
+  fecha     DateTime
+  estado    EstadoSesion @default(PROGRAMADA)
+  notas     String?
+  createdAt DateTime     @default(now()) @map("created_at")
+
+  clase                 Clase          @relation(fields: [claseId], references: [id])
+  asistencias           Asistencia[]
+  recuperacionesOrigen  Recuperacion[] @relation("SesionOrigen")
+  recuperacionesDestino Recuperacion[] @relation("SesionRecuperacion")
+
+  @@map("sesiones")
+}
+
+model Asistencia {
+  id        String           @id @default(cuid())
+  sesionId  String           @map("sesion_id")
+  alumnoId  String           @map("alumno_id")
+  estado    EstadoAsistencia @default(PRESENTE)
+  createdAt DateTime         @default(now()) @map("created_at")
+
+  sesion Sesion @relation(fields: [sesionId], references: [id])
+  alumno Alumno @relation(fields: [alumnoId], references: [id])
+
+  @@unique([sesionId, alumnoId])
+  @@map("asistencias")
+}
+
+model Recuperacion {
+  id                   String             @id @default(cuid())
+  alumnoId             String             @map("alumno_id")
+  sesionOrigenId       String             @map("sesion_origen_id")
+  sesionRecuperacionId String?            @map("sesion_recuperacion_id")
+  estado               EstadoRecuperacion @default(PENDIENTE)
+  expiraEn             DateTime           @map("expira_en")
+  notas                String?
+  createdAt            DateTime           @default(now()) @map("created_at")
+
+  alumno             Alumno  @relation(fields: [alumnoId], references: [id])
+  sesionOrigen       Sesion  @relation("SesionOrigen", fields: [sesionOrigenId], references: [id])
+  sesionRecuperacion Sesion? @relation("SesionRecuperacion", fields: [sesionRecuperacionId], references: [id])
+
+  @@map("recuperaciones")
+}
+
+model Notificacion {
+  id        String             @id @default(cuid())
+  alumnoId  String             @map("alumno_id")
+  sesionId  String?            @map("sesion_id")
+  tipo      TipoNotificacion   @default(PLAZA_LIBRE)
+  mensaje   String
+  estado    EstadoNotificacion @default(PENDIENTE)
+  enviadaEn DateTime?          @map("enviada_en")
+  createdAt DateTime           @default(now()) @map("created_at")
+
+  alumno Alumno @relation(fields: [alumnoId], references: [id])
+
+  @@map("notificaciones")
+}
+
+model Usuario {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String
+  nombre    String
+  role      Role     @default(STAFF)
+  activo    Boolean  @default(true)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("usuarios")
+}
+
+// ─────────────────────────────────────────
+//  ENUMS
+// ─────────────────────────────────────────
+
+enum Disponibilidad {
+  MANANA
+  TARDE
+  FLEXIBLE
+}
+
+enum DiaSemana {
+  LUNES
+  MARTES
+  MIERCOLES
+  JUEVES
+  VIERNES
+  SABADO
+  DOMINGO
+}
+
+enum EstadoSesion {
+  PROGRAMADA
+  EN_CURSO
+  COMPLETADA
+  CANCELADA
+}
+
+enum EstadoAsistencia {
+  PRESENTE
+  FALTA
+  RECUPERACION
+  JUSTIFICADA
+}
+
+enum EstadoRecuperacion {
+  PENDIENTE
+  RESERVADA
+  COMPLETADA
+  VENCIDA
+  CANCELADA
+}
+
+enum TipoNotificacion {
+  PLAZA_LIBRE
+  RECUPERACION_DISPONIBLE
+  RECORDATORIO
+}
+
+enum EstadoNotificacion {
+  PENDIENTE
+  ENVIADA
+  FALLIDA
+  LEIDA
+}
+
+enum Role {
+  ADMIN
+  STAFF
+}
