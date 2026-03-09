@@ -1,9 +1,9 @@
 @import "tailwindcss";
 
 @theme {
-  --color-primary: #10b981;
-  --color-primary-dark: #059669;
-  --color-primary-light: #d1fae5;
+  --color-primary: #1e83ec;
+  --color-primary-dark: #1565c4;
+  --color-primary-light: #e8f4fd;
 }
 
 /* Tipografía base */
@@ -26,10 +26,10 @@ body {
 }
 
 .btn-primary {
-  background: #10b981;
+  background: #1e83ec;
   color: #fff;
 }
-.btn-primary:hover { background: #059669; }
+.btn-primary:hover { background: #1565c4; }
 
 .btn-secondary {
   background: #f1f5f9;
@@ -73,6 +73,7 @@ body {
 .badge-yellow { background: #fef9c3; color: #854d0e; }
 .badge-red    { background: #fee2e2; color: #b91c1c; }
 .badge-blue   { background: #dbeafe; color: #1d4ed8; }
+.badge-sky    { background: #e0f2fe; color: #0369a1; }
 .badge-gray   { background: #f1f5f9; color: #475569; }
 .badge-purple { background: #f3e8ff; color: #7e22ce; }
 
@@ -87,7 +88,7 @@ body {
   transition: border-color 0.15s;
   background: #fff;
 }
-.input:focus { border-color: #10b981; box-shadow: 0 0 0 3px rgba(16,185,129,.12); }
+.input:focus { border-color: #1e83ec; box-shadow: 0 0 0 3px rgba(30,131,236,.12); }
 
 .label {
   display: block;
@@ -104,7 +105,7 @@ body {
 .spinner {
   width: 2rem; height: 2rem;
   border: 3px solid #e2e8f0;
-  border-top-color: #10b981;
+  border-top-color: #1e83ec;
   border-radius: 50%;
   animation: spin 0.7s linear infinite;
 }

@@ -141,4 +141,138 @@ router.put('/:id/completar', async (req: Request, res: Response) => {
   }
 });
 
+// POST /api/recuperaciones/falta-anticipada
+// Body: { claseId, alumnoId, fecha: "2026-03-15" }
+// Registra una falta anticipada desde el calendario: crea/busca la sesión, marca la asistencia como
+// FALTA y genera la recuperación pendiente para que el alumno pueda recuperarla más adelante.
+router.post('/falta-anticipada', async (req: Request, res: Response) => {
+  try {
+    const { claseId, alumnoId, fecha } = req.body;
+
+    if (!claseId || !alumnoId || !fecha) {
+      return res.status(400).json({ error: 'Se requiere claseId, alumnoId y fecha' });
+    }
+
+    // Verificar que la clase existe y el alumno está inscrito
+    const clase = await prisma.clase.findUnique({
+      where: { id: claseId },
+      include: {
+        inscripciones: { where: { alumnoId, activo: true } },
+      },
+    });
+
+    if (!clase) return res.status(404).json({ error: 'Clase no encontrada' });
+    if (clase.inscripciones.length === 0) {
+      return res.status(409).json({ error: 'El alumno no está inscrito en esta clase' });
+    }
+
+    // Construir la fecha/hora de la sesión
+    const [h, m] = clase.horaInicio.split(':').map(Number);
+    const fechaSesion = new Date(fecha);
+    fechaSesion.setHours(h, m, 0, 0);
+
+    // Buscar o crear la sesión para esa fecha
+    let sesion = await prisma.sesion.findFirst({
+      where: {
+        claseId,
+        fecha: {
+          gte: new Date(new Date(fechaSesion).setHours(0, 0, 0, 0)),
+          lt: new Date(new Date(fechaSesion).setHours(23, 59, 59, 999)),
+        },
+      },
+    });
+
+    if (!sesion) {
+      sesion = await prisma.sesion.create({
+        data: { claseId, fecha: fechaSesion, estado: 'PROGRAMADA' },
+      });
+    }
+
+    // Registrar asistencia como FALTA
+    await prisma.asistencia.upsert({
+      where: { sesionId_alumnoId: { sesionId: sesion.id, alumnoId } },
+      update: { estado: 'FALTA' },
+      create: { sesionId: sesion.id, alumnoId, estado: 'FALTA' },
+    });
+
+    // Crear recuperación si no existe ya una activa para esta sesión
+    const yaExiste = await prisma.recuperacion.findFirst({
+      where: {
+        alumnoId,
+        sesionOrigenId: sesion.id,
+        estado: { notIn: ['CANCELADA', 'VENCIDA'] },
+      },
+    });
+
+    let recuperacion = yaExiste;
+    if (!yaExiste) {
+      const expiraEn = new Date(fechaSesion);
+      expiraEn.setDate(expiraEn.getDate() + 30);
+
+      recuperacion = await prisma.recuperacion.create({
+        data: {
+          alumnoId,
+          sesionOrigenId: sesion.id,
+          estado: 'PENDIENTE',
+          expiraEn,
+        },
+      });
+    }
+
+    res.json({ ok: true, sesionId: sesion.id, recuperacion });
+  } catch (error: any) {
+    res.status(500).json({ error: 'Error al registrar falta anticipada', detalle: error.message });
+  }
+});
+
+// GET /api/recuperaciones/candidatos?claseId=X
+// Alumnos con recuperación PENDIENTE agrupados por nivel compatible con la clase
+router.get('/candidatos', async (req: Request, res: Response) => {
+  try {
+    const { claseId } = req.query;
+    if (!claseId) return res.status(400).json({ error: 'claseId requerido' });
+
+    const clase = await prisma.clase.findUnique({ where: { id: claseId as string } });
+    if (!clase) return res.status(404).json({ error: 'Clase no encontrada' });
+
+    const recuperaciones = await prisma.recuperacion.findMany({
+      where: { estado: 'PENDIENTE' },
+      include: {
+        alumno: true,
+        sesionOrigen: { include: { clase: { include: { pista: true } } } },
+      },
+      orderBy: { createdAt: 'asc' },
+    });
+
+    // Excluir alumnos ya inscritos en esta clase
+    const inscritos = await prisma.alumnoClase.findMany({
+      where: { claseId: claseId as string, activo: true },
+      select: { alumnoId: true },
+    });
+    const inscritosIds = new Set(inscritos.map((i) => i.alumnoId));
+
+    const candidatos = recuperaciones
+      .filter((r) => !inscritosIds.has(r.alumnoId))
+      .map((r) => ({
+        recuperacionId: r.id,
+        alumnoId: r.alumnoId,
+        nombre: r.alumno.nombre,
+        apellidos: r.alumno.apellidos,
+        nivel: r.alumno.nivel,
+        claseOrigen: r.sesionOrigen.clase.nombre,
+        pistaOrigen: r.sesionOrigen.clase.pista.numero,
+        fechaOrigen: r.sesionOrigen.fecha,
+        expiraEn: r.expiraEn,
+        compatible: r.alumno.nivel >= clase.nivelMin - 0.5 && r.alumno.nivel <= clase.nivelMax + 0.5,
+      }));
+
+    const compatibles = candidatos.filter((c) => c.compatible);
+    const otros = candidatos.filter((c) => !c.compatible);
+
+    res.json({ compatibles, otros, clase: { nombre: clase.nombre, nivelMin: clase.nivelMin, nivelMax: clase.nivelMax } });
+  } catch (error: any) {
+    res.status(500).json({ error: 'Error al obtener candidatos', detalle: error.message });
+  }
+});
+
 export default router;

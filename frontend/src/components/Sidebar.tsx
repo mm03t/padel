@@ -8,13 +8,19 @@ import {
   CalendarDays,
   RotateCcw,
   MessageCircle,
+  CreditCard,
+  LayoutGrid,
+  ListOrdered,
 } from 'lucide-react';
 
 const nav = [
   { href: '/',                label: 'Dashboard',       icon: LayoutDashboard },
   { href: '/alumnos',         label: 'Alumnos',         icon: Users },
   { href: '/clases',          label: 'Clases',          icon: CalendarDays },
+  { href: '/pistas',          label: 'Pistas',          icon: LayoutGrid },
+  { href: '/lista-espera',    label: 'Lista espera',    icon: ListOrdered },
   { href: '/recuperaciones',  label: 'Recuperaciones',  icon: RotateCcw },
+  { href: '/pagos',           label: 'Pagos',           icon: CreditCard },
   { href: '/notificaciones',  label: 'WhatsApp',        icon: MessageCircle },
 ];
 
@@ -26,7 +32,7 @@ export default function Sidebar() {
       {/* Logo */}
       <div className="px-5 py-5 border-b border-slate-700/60">
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 bg-emerald-500 rounded-lg flex items-center justify-center text-lg font-black">
+          <div className="w-9 h-9 rounded-lg flex items-center justify-center text-lg font-black" style={{ background: '#1e83ec' }}>
             🎾
           </div>
           <div>
@@ -46,9 +52,10 @@ export default function Sidebar() {
               href={href}
               className={`flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
                 active
-                  ? 'bg-emerald-600 text-white'
+                  ? 'text-white'
                   : 'text-slate-400 hover:bg-slate-800 hover:text-white'
               }`}
+              style={active ? { background: '#1e83ec' } : {}}
             >
               <Icon size={17} strokeWidth={2} />
               {label}

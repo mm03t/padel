@@ -7,6 +7,7 @@ export type EstadoAsistencia = 'PRESENTE' | 'FALTA' | 'RECUPERACION' | 'JUSTIFIC
 export type EstadoRecuperacion = 'PENDIENTE' | 'RESERVADA' | 'COMPLETADA' | 'VENCIDA' | 'CANCELADA';
 export type EstadoNotificacion = 'PENDIENTE' | 'ENVIADA' | 'FALLIDA' | 'LEIDA';
 export type TipoNotificacion = 'PLAZA_LIBRE' | 'RECUPERACION_DISPONIBLE' | 'RECORDATORIO';
+export type EstadoPago = 'PAGADO' | 'PENDIENTE' | 'VENCIDO';
 
 export interface Alumno {
   id: string;
@@ -18,6 +19,7 @@ export interface Alumno {
   disponibilidad: Disponibilidad;
   activo: boolean;
   notas?: string;
+  tarifaMensual?: number;
   createdAt: string;
   inscripciones?: AlumnoClase[];
   recuperaciones?: Recuperacion[];
@@ -137,4 +139,84 @@ export interface PlazaLibre {
   };
   plazasLibres: number;
   alumnosCompatibles: Alumno[];
+}
+
+export interface Pago {
+  id: string;
+  alumnoId: string;
+  mes: number;
+  año: number;
+  importe: number;
+  estado: EstadoPago;
+  notas?: string;
+  createdAt: string;
+  alumno: Alumno;
+}
+
+export interface ListaEspera {
+  id: string;
+  alumnoId: string;
+  claseId: string;
+  posicion: number;
+  createdAt: string;
+  alumno: Alumno;
+  clase: Clase;
+}
+
+export type EstadoSolicitud = 'PENDIENTE' | 'CONTACTADO' | 'ASIGNADO' | 'RECHAZADO';
+
+export interface SolicitudEspera {
+  id: string;
+  nombre: string;
+  apellidos: string;
+  email: string;
+  telefono?: string;
+  nivel?: number;
+  notas?: string;
+  estado: EstadoSolicitud;
+  createdAt: string;
+}
+
+export interface AltaResult {
+  alumno: Alumno;
+  asignacion: { claseId: string; nombre: string; pista: number; dia: string; hora: string } | null;
+  enEspera: boolean;
+}
+
+export interface ClaseDisponible {
+  id: string;
+  nombre: string;
+  dia: string;
+  hora: string;
+  pista: number;
+  profesor: string;
+  plazasTotal: number;
+  inscritos: number;
+  plazasLibres: number;
+}
+
+export interface BajaResult {
+  ok: boolean;
+  mensaje: string;
+  plazasLiberadas: number;
+  asignados: Array<{ claseId: string; alumnoId: string; posicion: number }>;
+}
+
+export interface CandidatoHueco {
+  recuperacionId: string;
+  alumnoId: string;
+  nombre: string;
+  apellidos: string;
+  nivel: number;
+  claseOrigen: string;
+  pistaOrigen: number;
+  fechaOrigen: string;
+  expiraEn: string;
+  compatible: boolean;
+}
+
+export interface CandidatosHueco {
+  compatibles: CandidatoHueco[];
+  otros: CandidatoHueco[];
+  clase: { nombre: string; nivelMin: number; nivelMax: number };
 }

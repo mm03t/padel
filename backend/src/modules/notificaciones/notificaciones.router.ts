@@ -169,4 +169,37 @@ router.post('/enviar-lote', async (req: Request, res: Response) => {
   }
 });
 
+// POST /api/notificaciones/notificar-hueco
+// Notifica a alumnos seleccionados que hay un hueco para recuperar una clase
+router.post('/notificar-hueco', async (req: Request, res: Response) => {
+  try {
+    const { alumnoIds, claseId, fecha } = req.body;
+    if (!alumnoIds || !Array.isArray(alumnoIds) || !claseId) {
+      return res.status(400).json({ error: 'alumnoIds y claseId requeridos' });
+    }
+
+    const clase = await prisma.clase.findUnique({
+      where: { id: claseId },
+      include: { pista: true, profesor: true },
+    });
+    if (!clase) return res.status(404).json({ error: 'Clase no encontrada' });
+
+    const fechaFormateada = fecha ? new Date(fecha).toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' }) : 'próximamente';
+
+    await prisma.notificacion.createMany({
+      data: alumnoIds.map((alumnoId: string) => ({
+        alumnoId,
+        tipo: 'PLAZA_DISPONIBLE',
+        mensaje: `Hay un hueco disponible para recuperar en la clase "${clase.nombre}" (Pista ${clase.pista.numero}) el ${fechaFormateada}. Contacta con la academia si puedes asistir.`,
+        leida: false,
+      })),
+      skipDuplicates: true,
+    });
+
+    res.json({ ok: true, notificados: alumnoIds.length });
+  } catch (error: any) {
+    res.status(500).json({ error: 'Error al notificar hueco', detalle: error.message });
+  }
+});
+
 export default router;

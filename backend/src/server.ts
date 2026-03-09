@@ -9,6 +9,9 @@ import sesionesRouter from './modules/sesiones/sesiones.router';
 import recuperacionesRouter from './modules/recuperaciones/recuperaciones.router';
 import notificacionesRouter from './modules/notificaciones/notificaciones.router';
 import dashboardRouter from './modules/dashboard/dashboard.router';
+import pagosRouter from './modules/pagos/pagos.router';
+import listaEsperaRouter from './modules/lista-espera/lista-espera.router';
+import solicitudesEsperaRouter from './modules/solicitudes-espera/solicitudes-espera.router';
 
 const app = express();
 const PORT = process.env.PORT || 3003;
@@ -25,6 +28,9 @@ app.use('/api/sesiones', sesionesRouter);
 app.use('/api/recuperaciones', recuperacionesRouter);
 app.use('/api/notificaciones', notificacionesRouter);
 app.use('/api/dashboard', dashboardRouter);
+app.use('/api/pagos', pagosRouter);
+app.use('/api/lista-espera', listaEsperaRouter);
+app.use('/api/solicitudes-espera', solicitudesEsperaRouter);
 
 app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', app: 'Academia Pádel API', ts: new Date().toISOString() });

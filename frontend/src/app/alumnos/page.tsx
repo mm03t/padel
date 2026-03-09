@@ -1,9 +1,9 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { UserPlus, Search, Pencil, Power } from 'lucide-react';
+import { UserPlus, Search, Pencil, Power, CheckCircle, Clock, Zap } from 'lucide-react';
 import { alumnos as api } from '@/lib/api';
-import type { Alumno, Disponibilidad } from '@/types';
+import type { Alumno, Disponibilidad, ClaseDisponible } from '@/types';
 
 const NIVELES = [1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0];
 const DISPONIBILIDAD_LABEL: Record<Disponibilidad, string> = {
@@ -34,6 +34,15 @@ export default function AlumnosPage() {
   });
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState('');
+  const [clasesDisponibles, setClasesDisponibles] = useState<ClaseDisponible[]>([]);
+  const [claseSeleccionada, setClaseSeleccionada] = useState<string>('auto');
+  const [loadingClases, setLoadingClases] = useState(false);
+  const [toast, setToast] = useState<{ msg: string; ok: boolean; detail?: string } | null>(null);
+
+  const showToast = (msg: string, ok = true, detail?: string) => {
+    setToast({ msg, ok, detail });
+    setTimeout(() => setToast(null), 6000);
+  };
 
   const cargar = () => {
     setLoading(true);
@@ -45,19 +54,52 @@ export default function AlumnosPage() {
 
   useEffect(() => { cargar(); }, [search, filtroActivo]);
 
-  const abrirNuevo = () => setModal({ open: true, data: { ...EMPTY } });
-  const abrirEditar = (a: Alumno) => setModal({ open: true, data: { ...a }, editId: a.id });
-  const cerrar = () => { setModal({ open: false, data: EMPTY }); setSaveError(''); };
+  const abrirNuevo = () => {
+    setModal({ open: true, data: { ...EMPTY } });
+    setClaseSeleccionada('auto');
+    cargarClasesDisponibles(EMPTY.nivel ?? 1.0);
+  };
+  const abrirEditar = (a: Alumno) => {
+    setModal({ open: true, data: { ...a }, editId: a.id });
+    setClasesDisponibles([]);
+  };
+  const cerrar = () => { setModal({ open: false, data: EMPTY }); setSaveError(''); setClasesDisponibles([]); setClaseSeleccionada('auto'); };
+
+  const cargarClasesDisponibles = (nivel: number) => {
+    setLoadingClases(true);
+    api.clasesDisponibles(nivel)
+      .then(setClasesDisponibles)
+      .catch(() => setClasesDisponibles([]))
+      .finally(() => setLoadingClases(false));
+  };
+
+  const campoNivel = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const val = parseFloat(e.target.value);
+    setModal((m) => ({ ...m, data: { ...m.data, nivel: val } }));
+    if (!modal.editId) {
+      setClaseSeleccionada('auto');
+      cargarClasesDisponibles(val);
+    }
+  };
 
   const guardar = async () => {
     setSaving(true); setSaveError('');
     try {
       if (modal.editId) {
         await api.update(modal.editId, modal.data);
+        cerrar(); cargar();
       } else {
-        await api.create(modal.data);
+        const res = await api.create({ ...modal.data, ...(claseSeleccionada !== 'auto' ? { claseId: claseSeleccionada } : {}) });
+        cerrar(); cargar();
+        if (res.enEspera) {
+          showToast('Alumno creado · Sin plaza disponible', false, 'Añadido a lista de espera');
+        } else if (res.asignacion) {
+          const a = res.asignacion;
+          showToast(`Alumno creado · Asignado a ${a.nombre}`, true, `Pista ${a.pista} · ${a.dia} ${a.hora}`);
+        } else {
+          showToast('Alumno creado', true);
+        }
       }
-      cerrar(); cargar();
     } catch (e: any) {
       setSaveError(e.message);
     } finally {
@@ -66,8 +108,22 @@ export default function AlumnosPage() {
   };
 
   const toggleActivo = async (a: Alumno) => {
-    await api.update(a.id, { activo: !a.activo });
-    cargar();
+    if (a.activo) {
+      const res = await api.remove(a.id);
+      cargar();
+      if (res.asignados?.length > 0) {
+        showToast(
+          `${a.nombre} desactivado · ${res.plazasLiberadas} plaza(s) liberada(s)`,
+          true,
+          `${res.asignados.length} alumno(s) asignado(s) desde lista de espera`,
+        );
+      } else {
+        showToast(`${a.nombre} desactivado`, true, `${res.plazasLiberadas} plaza(s) liberada(s)`);
+      }
+    } else {
+      await api.update(a.id, { activo: true });
+      cargar();
+    }
   };
 
   const campo = (key: keyof Alumno) => (e: any) =>
@@ -75,6 +131,20 @@ export default function AlumnosPage() {
 
   return (
     <div className="p-8 max-w-6xl">
+      {/* Toast */}
+      {toast && (
+        <div
+          className="fixed top-4 right-4 z-50 flex items-start gap-3 px-4 py-3 rounded-xl shadow-lg text-white text-sm max-w-sm animate-in fade-in slide-in-from-top-2"
+          style={{ background: toast.ok ? '#1e83ec' : '#f59e0b' }}
+        >
+          {toast.ok ? <CheckCircle size={16} className="mt-0.5 shrink-0" /> : <Clock size={16} className="mt-0.5 shrink-0" />}
+          <div>
+            <p className="font-semibold leading-tight">{toast.msg}</p>
+            {toast.detail && <p className="text-xs mt-0.5 opacity-90">{toast.detail}</p>}
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
@@ -177,7 +247,7 @@ export default function AlumnosPage() {
       {/* Modal */}
       {modal.open && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-          <div className="card w-full max-w-lg max-h-[90vh] overflow-y-auto p-6">
+          <div className="card w-full max-w-2xl max-h-[90vh] overflow-y-auto p-6">
             <h2 className="text-lg font-black mb-5">
               {modal.editId ? 'Editar alumno' : 'Nuevo alumno'}
             </h2>
@@ -201,7 +271,7 @@ export default function AlumnosPage() {
               </div>
               <div>
                 <label className="label">Nivel</label>
-                <select className="input" value={modal.data.nivel || 1.0} onChange={campo('nivel')}>
+                <select className="input" value={modal.data.nivel || 1.0} onChange={campoNivel}>
                   {NIVELES.map((n) => (
                     <option key={n} value={n}>{n.toFixed(1)}</option>
                   ))}
@@ -219,6 +289,93 @@ export default function AlumnosPage() {
                 <label className="label">Notas (opcional)</label>
                 <textarea className="input h-20 resize-none" value={modal.data.notas || ''} onChange={campo('notas')} />
               </div>
+
+              {!modal.editId && (
+                <div className="col-span-2">
+                  <label className="label flex items-center gap-2">
+                    Clase
+                    {loadingClases && <span className="spinner" style={{ width: 12, height: 12 }} />}
+                  </label>
+
+                  {/* Opción: auto */}
+                  <button
+                    type="button"
+                    onClick={() => setClaseSeleccionada('auto')}
+                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border-2 text-sm mb-3 transition-all ${
+                      claseSeleccionada === 'auto'
+                        ? 'border-[#1e83ec] bg-blue-50 text-[#1e83ec] font-semibold'
+                        : 'border-slate-200 hover:border-slate-300 text-slate-600'
+                    }`}
+                  >
+                    <Zap size={15} className="shrink-0" />
+                    <span>Asignar automáticamente</span>
+                    <span className="ml-auto text-xs opacity-60">El sistema elige la mejor plaza</span>
+                  </button>
+
+                  {loadingClases && (
+                    <div className="text-xs text-slate-400 text-center py-2">Cargando clases compatibles…</div>
+                  )}
+
+                  {!loadingClases && clasesDisponibles.length === 0 && (
+                    <div className="text-xs text-amber-600 bg-amber-50 px-3 py-2 rounded-lg">
+                      Sin clases compatibles con este nivel — el alumno irá a lista de espera general
+                    </div>
+                  )}
+
+                  {/* Clases con plaza libre */}
+                  {clasesDisponibles.filter((c) => c.plazasLibres > 0).length > 0 && (
+                    <>
+                      <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2">
+                        Con plaza libre
+                      </p>
+                      <div className="grid grid-cols-2 gap-2 mb-3">
+                        {clasesDisponibles
+                          .filter((c) => c.plazasLibres > 0)
+                          .map((c) => (
+                            <button
+                              key={c.id}
+                              type="button"
+                              onClick={() => setClaseSeleccionada(c.id)}
+                              className={`text-left px-3 py-2.5 rounded-xl border-2 transition-all ${
+                                claseSeleccionada === c.id
+                                  ? 'border-[#1e83ec] bg-blue-50'
+                                  : 'border-slate-200 hover:border-slate-300'
+                              }`}
+                            >
+                              <p className="font-semibold text-slate-800 text-xs leading-tight">{c.nombre}</p>
+                              <p className="text-[11px] text-slate-500 mt-0.5">{c.dia} · {c.hora}</p>
+                              <p className="text-[11px] text-slate-500">Pista {c.pista} · {c.profesor.split(' ')[0]}</p>
+                              <div className="mt-1.5 flex gap-1 items-center">
+                                {Array.from({ length: c.plazasTotal }).map((_, i) => (
+                                  <span
+                                    key={i}
+                                    className={`inline-block h-2 w-2 rounded-full ${
+                                      i < c.inscritos ? 'bg-slate-300' : 'bg-emerald-400'
+                                    }`}
+                                  />
+                                ))}
+                                <span className="text-[10px] text-emerald-600 font-semibold ml-1">
+                                  {c.plazasLibres} libre
+                                </span>
+                              </div>
+                            </button>
+                          ))}
+                      </div>
+                    </>
+                  )}
+
+                  {/* Resumen selección */}
+                  {claseSeleccionada !== 'auto' && (() => {
+                    const c = clasesDisponibles.find((x) => x.id === claseSeleccionada);
+                    if (!c) return null;
+                    return (
+                      <p className="text-xs mt-3 px-3 py-2 rounded-lg font-medium bg-emerald-50 text-emerald-700">
+                        ✅ Plaza confirmada · Profesor: {c.profesor}
+                      </p>
+                    );
+                  })()}
+                </div>
+              )}
             </div>
 
             {saveError && (

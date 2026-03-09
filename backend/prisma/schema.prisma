@@ -24,6 +24,7 @@ model Alumno {
   disponibilidad Disponibilidad @default(FLEXIBLE)
   activo         Boolean        @default(true)
   notas          String?
+  tarifaMensual  Float?         @default(50) @map("tarifa_mensual")
   createdAt      DateTime       @default(now()) @map("created_at")
   updatedAt      DateTime       @updatedAt @map("updated_at")
 
@@ -31,8 +32,26 @@ model Alumno {
   asistencias    Asistencia[]
   recuperaciones Recuperacion[]
   notificaciones Notificacion[]
+  pagos          Pago[]
+  listaEspera    ListaEspera[]
 
   @@map("alumnos")
+}
+
+model Pago {
+  id        String      @id @default(cuid())
+  alumnoId  String      @map("alumno_id")
+  mes       Int
+  año       Int
+  importe   Float
+  estado    EstadoPago  @default(PENDIENTE)
+  notas     String?
+  createdAt DateTime    @default(now()) @map("created_at")
+
+  alumno Alumno @relation(fields: [alumnoId], references: [id])
+
+  @@unique([alumnoId, mes, año])
+  @@map("pagos")
 }
 
 model Profesor {
@@ -74,10 +93,11 @@ model Clase {
   activa      Boolean   @default(true)
   createdAt   DateTime  @default(now()) @map("created_at")
 
-  profesor      Profesor    @relation(fields: [profesorId], references: [id])
-  pista         Pista       @relation(fields: [pistaId], references: [id])
+  profesor      Profesor      @relation(fields: [profesorId], references: [id])
+  pista         Pista         @relation(fields: [pistaId], references: [id])
   inscripciones AlumnoClase[]
   sesiones      Sesion[]
+  listaEspera   ListaEspera[]
 
   @@map("clases")
 }
@@ -225,7 +245,48 @@ enum EstadoNotificacion {
   LEIDA
 }
 
+model ListaEspera {
+  id        String   @id @default(cuid())
+  alumnoId  String   @map("alumno_id")
+  claseId   String   @map("clase_id")
+  posicion  Int
+  createdAt DateTime @default(now()) @map("created_at")
+
+  alumno Alumno @relation(fields: [alumnoId], references: [id])
+  clase  Clase  @relation(fields: [claseId], references: [id])
+
+  @@unique([alumnoId, claseId])
+  @@map("lista_espera")
+}
+
+model SolicitudEspera {
+  id        String          @id @default(cuid())
+  nombre    String
+  apellidos String
+  email     String
+  telefono  String?
+  nivel     Float?
+  notas     String?
+  estado    EstadoSolicitud @default(PENDIENTE)
+  createdAt DateTime        @default(now()) @map("created_at")
+
+  @@map("solicitudes_espera")
+}
+
+enum EstadoSolicitud {
+  PENDIENTE
+  CONTACTADO
+  ASIGNADO
+  RECHAZADO
+}
+
 enum Role {
   ADMIN
   STAFF
+}
+
+enum EstadoPago {
+  PAGADO
+  PENDIENTE
+  VENCIDO
 }

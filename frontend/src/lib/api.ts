@@ -1,6 +1,7 @@
 import type {
   Alumno, Clase, Sesion, Recuperacion, Notificacion,
-  DashboardStats, PlazaLibre, Profesor, Pista,
+  DashboardStats, PlazaLibre, Profesor, Pista, Pago, ListaEspera, SolicitudEspera,
+  AltaResult, BajaResult,
 } from '@/types';
 
 const BASE = '/api';
@@ -33,11 +34,13 @@ export const alumnos = {
     return req<Alumno[]>(`/alumnos${qs}`);
   },
   get: (id: string) => req<Alumno>(`/alumnos/${id}`),
-  create: (data: Partial<Alumno>) =>
-    req<Alumno>('/alumnos', { method: 'POST', body: JSON.stringify(data) }),
+  clasesDisponibles: (nivel: number) =>
+    req<import('@/types').ClaseDisponible[]>(`/alumnos/clases-disponibles?nivel=${nivel}`),
+  create: (data: Partial<Alumno> & { claseId?: string }) =>
+    req<AltaResult>('/alumnos', { method: 'POST', body: JSON.stringify(data) }),
   update: (id: string, data: Partial<Alumno>) =>
     req<Alumno>(`/alumnos/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
-  remove: (id: string) => req(`/alumnos/${id}`, { method: 'DELETE' }),
+  remove: (id: string) => req<BajaResult>(`/alumnos/${id}`, { method: 'DELETE' }),
 };
 
 // ─────────────────────────────────────────
@@ -89,6 +92,11 @@ export const sesiones = {
       `/sesiones/${id}/asistencia`,
       { method: 'POST', body: JSON.stringify({ asistencias }) },
     ),
+  cancelarSesion: (claseId: string, fecha: string, motivo?: string) =>
+    req<{ ok: boolean; sesionId: string; alumnosAfectados: number; afectados: string[] }>(
+      '/sesiones/cancelar-sesion',
+      { method: 'POST', body: JSON.stringify({ claseId, fecha, motivo }) },
+    ),
 };
 
 // ─────────────────────────────────────────
@@ -108,6 +116,59 @@ export const recuperaciones = {
     }),
   cancelar: (id: string) =>
     req(`/recuperaciones/${id}/cancelar`, { method: 'PUT' }),
+  faltaAnticipada: (claseId: string, alumnoId: string, fecha: string) =>
+    req<{ ok: boolean; sesionId: string; recuperacion: Recuperacion }>(
+      '/recuperaciones/falta-anticipada',
+      { method: 'POST', body: JSON.stringify({ claseId, alumnoId, fecha }) },
+    ),
+  candidatos: (claseId: string) =>
+    req<import('@/types').CandidatosHueco>(`/recuperaciones/candidatos?claseId=${claseId}`),
+};
+
+// ─────────────────────────────────────────
+//  PAGOS
+// ─────────────────────────────────────────
+export const pagos = {
+  list: (params?: Record<string, string>) => {
+    const qs = params ? '?' + new URLSearchParams(params) : '';
+    return req<Pago[]>(`/pagos${qs}`);
+  },
+  generarMes: (mes: number, año: number) =>
+    req<{ ok: boolean; creados: number; mensaje?: string }>(
+      '/pagos/generar-mes',
+      { method: 'POST', body: JSON.stringify({ mes, año }) },
+    ),
+  update: (id: string, data: { estado?: string; importe?: number; notas?: string }) =>
+    req<Pago>(`/pagos/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  remove: (id: string) => req(`/pagos/${id}`, { method: 'DELETE' }),
+};
+
+// ─────────────────────────────────────────
+//  LISTA DE ESPERA
+// ─────────────────────────────────────────
+export const listaEspera = {
+  list: (claseId: string) => req<ListaEspera[]>(`/lista-espera?claseId=${claseId}`),
+  add: (alumnoId: string, claseId: string) =>
+    req<ListaEspera>('/lista-espera', { method: 'POST', body: JSON.stringify({ alumnoId, claseId }) }),
+  remove: (id: string) => req(`/lista-espera/${id}`, { method: 'DELETE' }),
+  inscribir: (id: string) => req('/lista-espera/inscribir/' + id, { method: 'POST' }),
+  notificar: (claseId: string) =>
+    req<{ ok: boolean; notificados: number }>(`/lista-espera/notificar/${claseId}`, { method: 'POST' }),
+};
+
+// ─────────────────────────────────────────
+//  SOLICITUDES DE ESPERA GENERAL
+// ─────────────────────────────────────────
+export const solicitudesEspera = {
+  list: (estado?: string) => {
+    const qs = estado ? `?estado=${estado}` : '';
+    return req<SolicitudEspera[]>(`/solicitudes-espera${qs}`);
+  },
+  create: (data: Partial<SolicitudEspera>) =>
+    req<SolicitudEspera>('/solicitudes-espera', { method: 'POST', body: JSON.stringify(data) }),
+  update: (id: string, data: Partial<SolicitudEspera>) =>
+    req<SolicitudEspera>(`/solicitudes-espera/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  remove: (id: string) => req(`/solicitudes-espera/${id}`, { method: 'DELETE' }),
 };
 
 // ─────────────────────────────────────────
@@ -126,5 +187,10 @@ export const notificaciones = {
         method: 'POST',
         body: JSON.stringify({ sesionId, alumnoIds, mensajePersonalizado }),
       },
+    ),
+  notificarHueco: (alumnoIds: string[], claseId: string, fecha: string) =>
+    req<{ ok: boolean; notificados: number }>(
+      '/notificaciones/notificar-hueco',
+      { method: 'POST', body: JSON.stringify({ alumnoIds, claseId, fecha }) },
     ),
 };

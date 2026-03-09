@@ -50,9 +50,9 @@ services:
     container_name: academia_frontend
     restart: unless-stopped
     ports:
-      - "3002:3000"
+      - "3002:3002"
     environment:
-      NEXT_PUBLIC_API_URL: http://localhost:3003
+      NEXT_PUBLIC_API_URL: http://10.100.101.19:3003
     depends_on:
       - backend
     networks:

@@ -138,7 +138,10 @@ router.delete('/:id/alumnos/:alumnoId', async (req: Request, res: Response) => {
       },
       data: { activo: false },
     });
-    res.json({ ok: true });
+
+    // Si hay alumnos en lista de espera, informar al llamador
+    const enEspera = await prisma.listaEspera.count({ where: { claseId: req.params.id } });
+    res.json({ ok: true, tieneListaEspera: enEspera > 0, totalEnEspera: enEspera });
   } catch (error) {
     res.status(500).json({ error: 'Error al eliminar alumno de la clase' });
   }
