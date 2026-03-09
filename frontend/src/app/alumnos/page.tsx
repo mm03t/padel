@@ -57,6 +57,8 @@ export default function AlumnosPage() {
       .finally(() => setLoading(false));
   };
 
+  useEffect(() => { cargar(); }, [filtroActivo, search]);
+
   const toggleSort = (col: typeof sortCol) => {
     if (sortCol === col) setSortDir((d) => d === 'asc' ? 'desc' : 'asc');
     else { setSortCol(col); setSortDir('asc'); }
