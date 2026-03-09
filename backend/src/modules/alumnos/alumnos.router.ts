@@ -6,13 +6,15 @@ const router = Router();
 // GET /api/alumnos
 router.get('/', async (req: Request, res: Response) => {
   try {
-    const { nivel, disponibilidad, activo, search } = req.query;
+    const { nivel, disponibilidad, activo, search, sinClase } = req.query;
 
     const alumnos = await prisma.alumno.findMany({
       where: {
         ...(activo !== undefined ? { activo: activo === 'true' } : {}),
         ...(disponibilidad ? { disponibilidad: disponibilidad as any } : {}),
         ...(nivel ? { nivel: parseFloat(nivel as string) } : {}),
+        // sinClase=true → alumnos activos sin ninguna inscripción activa
+        ...(sinClase === 'true' ? { inscripciones: { none: { activo: true } } } : {}),
         ...(search
           ? {
               OR: [

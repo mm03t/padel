@@ -3,9 +3,9 @@
 import { useEffect, useState, useCallback } from 'react';
 import { format, getDaysInMonth, startOfMonth, getDay } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { ChevronLeft, ChevronRight, X, Users, AlertCircle, Check, Clock, Bell, UserPlus, CheckCircle, Loader2, UserMinus } from 'lucide-react';
-import { clases as clasesApi, recuperaciones as recuperApi, listaEspera as listaEsperaApi, alumnos as alumnosApi } from '@/lib/api';
-import type { Clase, DiaSemana, ListaEspera, Alumno } from '@/types';
+import { ChevronLeft, ChevronRight, X, Users, AlertCircle, Check, Clock, Bell, UserPlus, CheckCircle, Loader2, UserMinus, AlertTriangle, Send } from 'lucide-react';
+import { clases as clasesApi, recuperaciones as recuperApi, listaEspera as listaEsperaApi, alumnos as alumnosApi, notificaciones as notifApi } from '@/lib/api';
+import type { Clase, DiaSemana, ListaEspera, Alumno, CandidatosHueco } from '@/types';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -81,6 +81,50 @@ export default function ClasesPage() {
   const [buscarEspera, setBuscarEspera] = useState('');
   const [procesandoEspera, setProcesandoEspera] = useState<string | null>(null);
 
+  // ── Modal recuperación ──────────────────────────────────────────────────────
+  const [modalCandidatos, setModalCandidatos] = useState<{
+    origen: string; claseId: string; candidatos: CandidatosHueco | null;
+  } | null>(null);
+  const [seleccionadosMod, setSeleccionadosMod] = useState<Set<string>>(new Set());
+  const [enviandoMod, setEnviandoMod] = useState(false);
+  const [fechaMod, setFechaMod] = useState('');
+
+  const abrirModalCandidatos = async (origen: string, claseId: string, fecha: string) => {
+    setFechaMod(fecha);
+    setModalCandidatos({ origen, claseId, candidatos: null });
+    try {
+      const candidatos = await recuperApi.candidatos(claseId);
+      setSeleccionadosMod(new Set(candidatos.compatibles.map((c) => c.alumnoId)));
+      setModalCandidatos({ origen, claseId, candidatos });
+    } catch {
+      setModalCandidatos((prev) => prev ? { ...prev, candidatos: null } : null);
+    }
+  };
+
+  const notificarSeleccionadosMod = async () => {
+    if (!modalCandidatos || seleccionadosMod.size === 0) return;
+    setEnviandoMod(true);
+    try {
+      const alumnoIds = Array.from(seleccionadosMod) as string[];
+      await notifApi.notificarHueco(alumnoIds, modalCandidatos.claseId, fechaMod);
+      setToast(`Notificados ${alumnoIds.length} alumno(s) ✓`);
+      setTimeout(() => setToast(''), 3500);
+      setModalCandidatos(null);
+    } catch (e: any) {
+      setToast(e.message ?? 'Error al notificar');
+      setTimeout(() => setToast(''), 3500);
+    }
+    setEnviandoMod(false);
+  };
+
+  const toggleSelecMod = (alumnoId: string) => {
+    setSeleccionadosMod((prev) => {
+      const next = new Set(prev);
+      if (next.has(alumnoId)) next.delete(alumnoId); else next.add(alumnoId);
+      return next;
+    });
+  };
+
   useEffect(() => {
     clasesApi.list({ activa: 'true' })
       .then(setClases)
@@ -118,8 +162,13 @@ export default function ClasesPage() {
       await recuperApi.faltaAnticipada(panel.clase.id, alumnoId, panel.fechaStr);
       setRegistrado((p) => ({ ...p, [alumnoId]: true }));
       const alumno = panel.clase.inscripciones.find((i) => i.alumnoId === alumnoId)?.alumno;
-      setToast(`Falta registrada para ${alumno?.nombre ?? ''}. Recuperación generada.`);
-      setTimeout(() => setToast(''), 4000);
+      setToast(`Falta registrada para ${alumno?.nombre ?? ''}`);
+      setTimeout(() => setToast(''), 2500);
+      await abrirModalCandidatos(
+        `Falta de ${alumno?.nombre ?? 'alumno'} — ${panel.clase.nombre}`,
+        panel.clase.id,
+        panel.fechaStr,
+      );
     } catch {
       setToast('Error al registrar la falta. Inténtalo de nuevo.');
       setTimeout(() => setToast(''), 4000);
@@ -128,15 +177,14 @@ export default function ClasesPage() {
     }
   }, [panel]);
 
-  // Quitar alumno de la clase y actualizar estado local inmediatamente
+  // Quitar alumno de la clase y abrir modal de recuperaciones
   const quitarDeClase = useCallback(async (alumnoId: string) => {
     if (!panel) return;
-    if (!confirm('¿Quitar a este alumno de la clase? Se eliminará su inscripción.')) return;
     const claseId = panel.clase.id;
+    const alumnoNombre = panel.clase.inscripciones.find((i) => i.alumnoId === alumnoId)?.alumno?.nombre ?? 'Alumno';
     setQuitando((p) => ({ ...p, [alumnoId]: true }));
     try {
       await clasesApi.desinscribir(claseId, alumnoId);
-      // Actualizar el array global de clases
       setClases((prev) =>
         prev.map((c) =>
           c.id !== claseId ? c : {
@@ -147,7 +195,6 @@ export default function ClasesPage() {
           },
         ),
       );
-      // Actualizar también la clase dentro del panel
       setPanel((prev) =>
         prev ? {
           ...prev,
@@ -159,9 +206,13 @@ export default function ClasesPage() {
           },
         } : null,
       );
-      const alumno = panel.clase.inscripciones.find((i) => i.alumnoId === alumnoId)?.alumno;
-      setToast(`${alumno?.nombre ?? 'Alumno'} quitado de la clase.`);
-      setTimeout(() => setToast(''), 3500);
+      setToast(`${alumnoNombre} quitado de la clase`);
+      setTimeout(() => setToast(''), 2500);
+      await abrirModalCandidatos(
+        `Plaza liberada — ${alumnoNombre} quitado de ${panel.clase.nombre}`,
+        claseId,
+        panel.fechaStr,
+      );
     } catch {
       setToast('Error al quitar al alumno. Inténtalo de nuevo.');
       setTimeout(() => setToast(''), 3500);
@@ -396,7 +447,7 @@ export default function ClasesPage() {
                             <button
                               onClick={() => quitarDeClase(insc.alumnoId)}
                               disabled={quitando[insc.alumnoId]}
-                              title="Quitar de la clase"
+                              title="Quitar de la clase (baja permanente)"
                               className="p-1 rounded text-slate-300 hover:text-rose-500 hover:bg-rose-50 transition-colors disabled:opacity-40"
                             >
                               <X size={13} />
@@ -407,6 +458,7 @@ export default function ClasesPage() {
                             <button
                               onClick={() => notificarFalta(insc.alumnoId)}
                               disabled={cargando}
+                              title="Registrar falta puntual — genera recuperación"
                               className="text-xs font-medium px-2 py-1 rounded-md border border-slate-200 bg-white text-slate-500 hover:border-amber-300 hover:text-amber-700 hover:bg-amber-50 transition-colors disabled:opacity-40"
                             >
                               {cargando ? '...' : 'Falta'}
@@ -414,7 +466,7 @@ export default function ClasesPage() {
                             <button
                               onClick={() => quitarDeClase(insc.alumnoId)}
                               disabled={quitando[insc.alumnoId]}
-                              title="Quitar de la clase"
+                              title="Quitar de la clase (baja permanente)"
                               className="p-1.5 rounded-md border border-slate-200 bg-white text-slate-400 hover:border-rose-300 hover:text-rose-500 hover:bg-rose-50 transition-colors disabled:opacity-40"
                             >
                               <X size={13} />
@@ -591,6 +643,137 @@ export default function ClasesPage() {
                   ) : <p className="text-xs text-slate-400 mt-1 italic">Sin resultados</p>;
                 })()}
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Modal candidatos recuperación ── */}
+      {modalCandidatos && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[85vh] flex flex-col">
+            {/* Header */}
+            <div className="px-5 py-4 border-b border-slate-100 flex items-start justify-between">
+              <div>
+                <div className="flex items-center gap-2 mb-0.5">
+                  <AlertTriangle size={16} className="text-amber-500" />
+                  <h2 className="font-black text-slate-800 text-base">Hueco disponible</h2>
+                </div>
+                <p className="text-xs text-slate-500">{modalCandidatos.origen}</p>
+              </div>
+              <button onClick={() => setModalCandidatos(null)} className="p-1 rounded-lg hover:bg-slate-100 text-slate-400 ml-3 shrink-0">
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="flex-1 overflow-y-auto px-5 py-4">
+              {!modalCandidatos.candidatos ? (
+                <div className="flex items-center justify-center py-10 gap-2 text-slate-400">
+                  <Loader2 size={16} className="animate-spin" />
+                  <span className="text-sm">Buscando candidatos…</span>
+                </div>
+              ) : modalCandidatos.candidatos.compatibles.length === 0 && modalCandidatos.candidatos.otros.length === 0 ? (
+                <div className="text-center py-10">
+                  <CheckCircle size={32} className="text-slate-300 mx-auto mb-2" />
+                  <p className="text-sm text-slate-400">No hay alumnos con recuperaciones pendientes.</p>
+                </div>
+              ) : (
+                <>
+                  {/* Compatibles por nivel */}
+                  {modalCandidatos.candidatos.compatibles.length > 0 && (
+                    <div className="mb-5">
+                      <p className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">
+                        Mismo nivel (Niv. {modalCandidatos.candidatos.clase.nivelMin}–{modalCandidatos.candidatos.clase.nivelMax})
+                      </p>
+                      <div className="space-y-2">
+                        {modalCandidatos.candidatos.compatibles.map((c) => (
+                          <label
+                            key={c.alumnoId}
+                            className={`flex items-start gap-3 p-3 rounded-xl border-2 cursor-pointer transition-all ${
+                              seleccionadosMod.has(c.alumnoId)
+                                ? 'border-[#1e83ec] bg-blue-50'
+                                : 'border-slate-200 hover:border-slate-300'
+                            }`}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={seleccionadosMod.has(c.alumnoId)}
+                              onChange={() => toggleSelecMod(c.alumnoId)}
+                              className="mt-0.5 accent-[#1e83ec]"
+                            />
+                            <div className="flex-1 min-w-0">
+                              <p className="font-semibold text-slate-800 text-sm">{c.nombre} {c.apellidos}</p>
+                              <p className="text-xs text-slate-500">Niv. {c.nivel} · Faltó en: {c.claseOrigen}</p>
+                              <p className="text-xs text-slate-400">{new Date(c.fechaOrigen).toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric', month: 'short' })}</p>
+                            </div>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Otros niveles — ordenados por distancia de nivel */}
+                  {modalCandidatos.candidatos.otros.length > 0 && (
+                    <div>
+                      <p className="text-xs font-bold text-slate-400 uppercase tracking-wide mb-1">
+                        Otros niveles <span className="normal-case font-normal">(pueden unirse si hay hueco)</span>
+                      </p>
+                      <div className="space-y-2">
+                        {[...modalCandidatos.candidatos.otros]
+                          .sort((a, b) => {
+                            const mid = (modalCandidatos.candidatos!.clase.nivelMin + modalCandidatos.candidatos!.clase.nivelMax) / 2;
+                            return Math.abs(a.nivel - mid) - Math.abs(b.nivel - mid);
+                          })
+                          .map((c) => (
+                            <label
+                              key={c.alumnoId}
+                              className={`flex items-start gap-3 p-3 rounded-xl border-2 cursor-pointer transition-all ${
+                                seleccionadosMod.has(c.alumnoId)
+                                  ? 'border-slate-400 bg-slate-50'
+                                  : 'border-slate-200 hover:border-slate-300'
+                              }`}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={seleccionadosMod.has(c.alumnoId)}
+                                onChange={() => toggleSelecMod(c.alumnoId)}
+                                className="mt-0.5"
+                              />
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2">
+                                  <p className="font-semibold text-slate-700 text-sm">{c.nombre} {c.apellidos}</p>
+                                  <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-500 font-semibold">Niv. {c.nivel}</span>
+                                </div>
+                                <p className="text-xs text-slate-500">Faltó en: {c.claseOrigen}</p>
+                                <p className="text-xs text-slate-400">{new Date(c.fechaOrigen).toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric', month: 'short' })}</p>
+                              </div>
+                            </label>
+                          ))}
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="px-5 py-4 border-t border-slate-100 flex items-center justify-between gap-3">
+              <button
+                onClick={() => setModalCandidatos(null)}
+                className="px-4 py-2 rounded-xl text-sm font-semibold border border-slate-200 text-slate-500 hover:bg-slate-50"
+              >
+                Saltar
+              </button>
+              <button
+                onClick={notificarSeleccionadosMod}
+                disabled={enviandoMod || seleccionadosMod.size === 0 || !modalCandidatos.candidatos}
+                className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold text-white disabled:opacity-50"
+                style={{ background: '#1e83ec' }}
+              >
+                {enviandoMod ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
+                Notificar{seleccionadosMod.size > 0 ? ` (${seleccionadosMod.size})` : ''}
+              </button>
             </div>
           </div>
         </div>

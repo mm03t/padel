@@ -28,7 +28,7 @@ export default function AlumnosPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [search, setSearch] = useState('');
-  const [filtroActivo, setFiltroActivo] = useState(true);
+  const [filtroTab, setFiltroTab] = useState<'activos' | 'inactivos' | 'sin_clase'>('activos');
   const [modal, setModal] = useState<{ open: boolean; data: Partial<Alumno>; editId?: string }>({
     open: false, data: EMPTY,
   });
@@ -46,13 +46,18 @@ export default function AlumnosPage() {
 
   const cargar = () => {
     setLoading(true);
-    api.list({ activo: String(filtroActivo), ...(search ? { search } : {}) })
+    const params: Record<string, string> = {};
+    if (filtroTab === 'activos') params.activo = 'true';
+    else if (filtroTab === 'inactivos') params.activo = 'false';
+    else { params.activo = 'true'; params.sinClase = 'true'; }
+    if (search) params.search = search;
+    api.list(params)
       .then(setLista)
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
   };
 
-  useEffect(() => { cargar(); }, [search, filtroActivo]);
+  useEffect(() => { cargar(); }, [search, filtroTab]);
 
   const abrirNuevo = () => {
     setModal({ open: true, data: { ...EMPTY } });
@@ -168,13 +173,13 @@ export default function AlumnosPage() {
           />
         </div>
         <div className="flex gap-2">
-          {[true, false].map((v) => (
+          {(['activos', 'inactivos', 'sin_clase'] as const).map((v) => (
             <button
-              key={String(v)}
-              onClick={() => setFiltroActivo(v)}
-              className={`btn ${filtroActivo === v ? 'btn-primary' : 'btn-secondary'}`}
+              key={v}
+              onClick={() => setFiltroTab(v)}
+              className={`btn ${filtroTab === v ? 'btn-primary' : 'btn-secondary'}`}
             >
-              {v ? 'Activos' : 'Inactivos'}
+              {v === 'activos' ? 'Activos' : v === 'inactivos' ? 'Inactivos' : 'Sin clase'}
             </button>
           ))}
         </div>
