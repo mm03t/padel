@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { UserPlus, Search, Pencil, Power, CheckCircle, Clock, Zap, ChevronUp, ChevronDown } from 'lucide-react';
 import { alumnos as api } from '@/lib/api';
 import type { Alumno, Disponibilidad, ClaseDisponible } from '@/types';
@@ -56,8 +57,6 @@ export default function AlumnosPage() {
       .finally(() => setLoading(false));
   };
 
-  useEffect(() => { cargar(); }, [search, filtroActivo]);
-
   const toggleSort = (col: typeof sortCol) => {
     if (sortCol === col) setSortDir((d) => d === 'asc' ? 'desc' : 'asc');
     else { setSortCol(col); setSortDir('asc'); }
@@ -78,6 +77,10 @@ export default function AlumnosPage() {
     if (va > vb) return sortDir === 'asc' ? 1 : -1;
     return 0;
   });
+
+  // Separar alumnos con clase de los que están en espera
+  const listaConClase = listaSorted.filter((a) => !a.activo || a.inscripciones?.some((i) => i.activo));
+  const sinClaseCount = filtroActivo ? listaSorted.filter((a) => a.activo && !a.inscripciones?.some((i) => i.activo)).length : 0;
 
   const abrirNuevo = () => {
     setModal({ open: true, data: { ...EMPTY } });
@@ -205,12 +208,28 @@ export default function AlumnosPage() {
         </div>
       </div>
 
+      {/* Callout sin clase */}
+      {sinClaseCount > 0 && (
+        <Link
+          href="/lista-espera"
+          className="flex items-center justify-between gap-3 mb-4 px-4 py-3 rounded-xl border border-amber-200 bg-amber-50 hover:bg-amber-100 transition-colors"
+        >
+          <div className="flex items-center gap-2">
+            <Clock size={15} className="text-amber-600 shrink-0" />
+            <p className="text-sm font-semibold text-amber-800">
+              {sinClaseCount} alumno{sinClaseCount > 1 ? 's' : ''} sin clase asignada — en cola de espera
+            </p>
+          </div>
+          <span className="text-xs font-semibold text-amber-600 underline">Ver lista de espera →</span>
+        </Link>
+      )}
+
       {/* Tabla */}
       {loading ? (
         <div className="flex justify-center py-16"><div className="spinner" /></div>
       ) : error ? (
         <div className="card p-6 text-rose-600 border-rose-200 bg-rose-50">{error}</div>
-      ) : lista.length === 0 ? (
+      ) : listaConClase.length === 0 ? (
         <div className="card p-12 text-center text-slate-400">No hay alumnos. ¡Crea el primero!</div>
       ) : (
         <div className="card overflow-hidden">
@@ -241,7 +260,7 @@ export default function AlumnosPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50">
-              {listaSorted.map((a) => {
+              {listaConClase.map((a) => {
                 const clasesActivas = a.inscripciones?.filter((i) => i.activo) ?? [];
                 const sinClase = clasesActivas.length === 0 && a.activo;
                 return (

@@ -5,10 +5,10 @@ import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import {
   UserPlus, Trash2, Mail, Phone, Trophy, Clock,
-  CheckCircle, X, Loader2, Users, AlertCircle, ChevronDown,
+  CheckCircle, X, Loader2, Users, AlertCircle, ChevronDown, CalendarDays, GraduationCap,
 } from 'lucide-react';
-import { solicitudesEspera } from '@/lib/api';
-import type { SolicitudEspera, EstadoSolicitud } from '@/types';
+import { solicitudesEspera, alumnos as alumnosApi, clases as clasesApi } from '@/lib/api';
+import type { SolicitudEspera, EstadoSolicitud, Alumno, ClaseDisponible } from '@/types';
 
 // ── Colores por estado ─────────────────────────────────────────────────────────
 const ESTADO_CONFIG: Record<EstadoSolicitud, { label: string; bg: string; text: string; border: string }> = {
@@ -34,6 +34,13 @@ export default function ListaEsperaPage() {
   const [toast, setToast] = useState('');
   const [cambiandoEstado, setCambiandoEstado] = useState<string | null>(null);
 
+  const [tab, setTab] = useState<'sin_plaza' | 'solicitudes'>('sin_plaza');
+  const [alumnosSinPlaza, setAlumnosSinPlaza] = useState<Alumno[]>([]);
+  const [cargandoSinPlaza, setCargandoSinPlaza] = useState(true);
+  const [asignandoId, setAsignandoId] = useState<string | null>(null);
+  const [clasesParaAsignar, setClasesParaAsignar] = useState<ClaseDisponible[]>([]);
+  const [cargandoClases, setCargandoClases] = useState(false);
+
   const showToast = (msg: string) => {
     setToast(msg);
     setTimeout(() => setToast(''), 3500);
@@ -48,7 +55,40 @@ export default function ListaEsperaPage() {
     }
   };
 
-  useEffect(() => { cargar(); }, []);
+  const cargarSinPlaza = () => {
+    setCargandoSinPlaza(true);
+    alumnosApi.list({ activo: 'true', sinClase: 'true' })
+      .then((data) =>
+        setAlumnosSinPlaza([...data].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()))
+      )
+      .finally(() => setCargandoSinPlaza(false));
+  };
+
+  useEffect(() => { cargar(); cargarSinPlaza(); }, []);
+
+  const iniciarAsignacion = async (a: Alumno) => {
+    setAsignandoId(a.id);
+    setClasesParaAsignar([]);
+    setCargandoClases(true);
+    try {
+      const disponibles = await alumnosApi.clasesDisponibles(a.nivel);
+      setClasesParaAsignar(disponibles.filter((c) => c.plazasLibres > 0));
+    } finally {
+      setCargandoClases(false);
+    }
+  };
+
+  const confirmarAsignacion = async (claseId: string, alumnoId: string) => {
+    try {
+      await clasesApi.inscribir(claseId, alumnoId);
+      setAsignandoId(null);
+      setClasesParaAsignar([]);
+      cargarSinPlaza();
+      showToast('Clase asignada. El alumno pasa a activo.');
+    } catch {
+      showToast('Error al asignar clase');
+    }
+  };
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -124,23 +164,57 @@ export default function ListaEsperaPage() {
       <div className="bg-white border-b border-slate-200 px-6 py-4 shrink-0">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-xl font-bold text-slate-800">Lista de Espera General</h1>
+            <h1 className="text-xl font-bold text-slate-800">Lista de Espera</h1>
             <p className="text-sm text-slate-500">
-              Nuevos alumnos esperando plaza · Academia completa
+              Gestión de alumnos sin plaza · Academia completa
             </p>
           </div>
+          {tab === 'solicitudes' && (
+            <button
+              onClick={() => { setMostrarForm(true); setError(''); setForm(FORM_VACIO); }}
+              className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold text-white shadow-sm"
+              style={{ background: '#1e83ec' }}
+            >
+              <UserPlus size={16} />
+              Nueva solicitud
+            </button>
+          )}
+        </div>
+
+        {/* Tabs */}
+        <div className="flex gap-1 mt-4 border-b border-slate-100 -mx-6 px-6">
           <button
-            onClick={() => { setMostrarForm(true); setError(''); setForm(FORM_VACIO); }}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold text-white shadow-sm"
-            style={{ background: '#1e83ec' }}
+            onClick={() => setTab('sin_plaza')}
+            className={`flex items-center gap-1.5 px-4 py-2 text-sm font-semibold border-b-2 transition-colors ${
+              tab === 'sin_plaza'
+                ? 'text-[#1e83ec] border-[#1e83ec]'
+                : 'text-slate-500 border-transparent hover:text-slate-700'
+            }`}
           >
-            <UserPlus size={16} />
-            Nueva solicitud
+            <GraduationCap size={14} />
+            Sin plaza asignada
+            {alumnosSinPlaza.length > 0 && (
+              <span className="ml-1 px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-700">
+                {alumnosSinPlaza.length}
+              </span>
+            )}
+          </button>
+          <button
+            onClick={() => setTab('solicitudes')}
+            className={`flex items-center gap-1.5 px-4 py-2 text-sm font-semibold border-b-2 transition-colors ${
+              tab === 'solicitudes'
+                ? 'text-[#1e83ec] border-[#1e83ec]'
+                : 'text-slate-500 border-transparent hover:text-slate-700'
+            }`}
+          >
+            <Users size={14} />
+            Solicitudes externas ({solicitudes.length})
           </button>
         </div>
 
-        {/* Contadores por estado */}
-        <div className="flex gap-2 mt-4 flex-wrap">
+        {/* Contadores por estado (solo en tab solicitudes) */}
+        {tab === 'solicitudes' && (
+          <div className="flex gap-2 mt-4 flex-wrap">
           <button
             onClick={() => setFiltroEstado('TODOS')}
             className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-colors ${
@@ -171,10 +245,114 @@ export default function ListaEsperaPage() {
             );
           })}
         </div>
+        )}
       </div>
 
+      {/* Sin plaza asignada */}
+      {tab === 'sin_plaza' && (
+        <div className="flex-1 overflow-auto p-6">
+          {cargandoSinPlaza ? (
+            <div className="flex items-center justify-center py-20">
+              <Loader2 size={28} className="animate-spin text-slate-300" />
+            </div>
+          ) : alumnosSinPlaza.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-20 text-center">
+              <GraduationCap size={40} className="text-slate-200 mb-3" />
+              <p className="text-slate-500 font-medium">Todos los alumnos tienen clase asignada</p>
+              <p className="text-slate-400 text-sm mt-1">Cuando se cree un alumno sin plaza disponible, aparecerá aquí.</p>
+            </div>
+          ) : (
+            <div className="grid gap-3 max-w-4xl">
+              {alumnosSinPlaza.map((a, idx) => (
+                <div key={a.id} className="bg-white rounded-xl border border-slate-200 p-4 flex items-start gap-4 hover:shadow-sm transition-shadow">
+                  {/* Posición en cola */}
+                  <div
+                    className="w-9 h-9 rounded-full flex items-center justify-center text-sm font-black shrink-0 mt-0.5"
+                    style={{ background: '#fef3c7', color: '#92400e' }}
+                  >
+                    {idx + 1}
+                  </div>
+
+                  {/* Info */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap mb-1">
+                      <h3 className="font-bold text-slate-800">{a.nombre} {a.apellidos}</h3>
+                      <span className="flex items-center gap-0.5 text-xs text-slate-500">
+                        <Trophy size={11} /> Niv. {a.nivel.toFixed(1)}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-3 text-xs text-slate-500 flex-wrap">
+                      <span className="flex items-center gap-1">
+                        <Mail size={11} /> {a.email}
+                      </span>
+                      {a.telefono && (
+                        <span className="flex items-center gap-1">
+                          <Phone size={11} /> {a.telefono}
+                        </span>
+                      )}
+                      <span className="flex items-center gap-1 font-medium text-amber-600">
+                        <CalendarDays size={11} />
+                        Alta: {format(new Date(a.createdAt), "d MMM yyyy", { locale: es })}
+                      </span>
+                    </div>
+                    {a.notas && <p className="text-xs text-slate-400 italic mt-1">{a.notas}</p>}
+
+                    {/* Selector de clase */}
+                    {asignandoId === a.id && (
+                      <div className="mt-3 p-3 rounded-lg bg-slate-50 border border-slate-200">
+                        {cargandoClases ? (
+                          <div className="flex items-center gap-2 text-xs text-slate-400">
+                            <Loader2 size={12} className="animate-spin" /> Buscando clases disponibles…
+                          </div>
+                        ) : clasesParaAsignar.length === 0 ? (
+                          <p className="text-xs text-amber-600">No hay clases con plaza libre para nivel {a.nivel.toFixed(1)}.</p>
+                        ) : (
+                          <div>
+                            <p className="text-xs font-semibold text-slate-600 mb-2">Selecciona una clase:</p>
+                            <div className="grid gap-1.5">
+                              {clasesParaAsignar.map((c) => (
+                                <button
+                                  key={c.id}
+                                  onClick={() => confirmarAsignacion(c.id, a.id)}
+                                  className="flex items-center justify-between px-3 py-2 rounded-lg border border-slate-200 hover:border-blue-300 hover:bg-blue-50 text-xs text-left transition-colors"
+                                >
+                                  <span className="font-semibold text-slate-700">{c.nombre}</span>
+                                  <span className="text-slate-400">{c.dia} · {c.hora} · {c.plazasLibres} plaza{c.plazasLibres !== 1 ? 's' : ''}</span>
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        <button
+                          onClick={() => setAsignandoId(null)}
+                          className="mt-2 text-xs text-slate-400 hover:text-slate-600"
+                        >
+                          Cancelar
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Botón asignar */}
+                  {asignandoId !== a.id && (
+                    <button
+                      onClick={() => iniciarAsignacion(a)}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-white shrink-0"
+                      style={{ background: '#1e83ec' }}
+                    >
+                      <CheckCircle size={12} />
+                      Asignar clase
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Formulario nueva solicitud */}
-      {mostrarForm && (
+      {tab === 'solicitudes' && mostrarForm && (
         <div className="bg-white border-b border-slate-200 px-6 py-5 shrink-0">
           <div className="flex items-center justify-between mb-4">
             <h2 className="font-bold text-slate-700">Nueva solicitud de espera</h2>
@@ -272,6 +450,7 @@ export default function ListaEsperaPage() {
       )}
 
       {/* Lista */}
+      {tab === 'solicitudes' && (
       <div className="flex-1 overflow-auto p-6">
         {cargando ? (
           <div className="flex items-center justify-center py-20">
@@ -369,6 +548,7 @@ export default function ListaEsperaPage() {
           </div>
         )}
       </div>
+      )}
     </div>
   );
 }
