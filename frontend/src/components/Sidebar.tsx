@@ -7,8 +7,6 @@ import {
   Users,
   CalendarDays,
   RotateCcw,
-  MessageCircle,
-  CreditCard,
   LayoutGrid,
   ListOrdered,
 } from 'lucide-react';
@@ -20,8 +18,6 @@ const nav = [
   { href: '/pistas',          label: 'Pistas',          icon: LayoutGrid },
   { href: '/lista-espera',    label: 'Lista espera',    icon: ListOrdered },
   { href: '/recuperaciones',  label: 'Recuperaciones',  icon: RotateCcw },
-  { href: '/pagos',           label: 'Pagos',           icon: CreditCard },
-  { href: '/notificaciones',  label: 'WhatsApp',        icon: MessageCircle },
 ];
 
 export default function Sidebar() {

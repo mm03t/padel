@@ -233,18 +233,22 @@ export default function PistasPage() {
   // Registrar falta de un alumno y abrir modal de huecos
   const registrarFalta = async (alumnoId: string, alumnoNombre: string) => {
     if (!panel) return;
+    const claseId = panel.clase.id;
+    const claseNombre = panel.clase.nombre;
     setProcesando('falta_' + alumnoId);
     try {
-      await api.recuperaciones.faltaAnticipada(panel.clase.id, alumnoId, fecha.toISOString());
-      // Recargar clase
-      const claseRefrescada = await api.clases.get(panel.clase.id);
-      const le = await api.listaEspera.list(panel.clase.id);
-      const claseActualizada = { ...claseRefrescada, listaEspera: le };
-      setPanel({ ...panel, clase: claseActualizada });
-      setClases((prev) => prev.map((c) => c.id === panel.clase.id ? claseActualizada : c));
+      await api.recuperaciones.faltaAnticipada(claseId, alumnoId, fecha.toISOString());
       showToast(`Falta registrada para ${alumnoNombre} ✓`);
-      // Abrir modal con candidatos
-      await abrirModalHueco(`Falta de ${alumnoNombre} en ${panel.clase.nombre}`, panel.clase.id);
+      // Abrir modal con candidatos inmediatamente
+      await abrirModalHueco(`Falta de ${alumnoNombre} en ${claseNombre}`, claseId);
+      // Refrescar clase en background (no bloquea el modal)
+      api.clases.get(claseId).then((claseRefrescada) => {
+        api.listaEspera.list(claseId).then((le) => {
+          const claseActualizada = { ...claseRefrescada, listaEspera: le };
+          setPanel((prev) => prev ? { ...prev, clase: claseActualizada } : prev);
+          setClases((prev) => prev.map((c) => c.id === claseId ? claseActualizada : c));
+        });
+      }).catch(() => {});
     } catch (e: any) {
       showToast(e.message ?? 'Error al registrar falta', false);
     }
@@ -254,17 +258,21 @@ export default function PistasPage() {
   // Cancelar clase entera
   const cancelarClase = async () => {
     if (!panel) return;
+    const claseId = panel.clase.id;
+    const claseNombre = panel.clase.nombre;
     setProcesando('cancelar');
     setConfirmarCancelar(false);
     try {
-      const res = await api.sesiones.cancelarSesion(panel.clase.id, fecha.toISOString(), 'Clase cancelada');
-      const claseRefrescada = await api.clases.get(panel.clase.id);
-      const le = await api.listaEspera.list(panel.clase.id);
-      const claseActualizada = { ...claseRefrescada, listaEspera: le };
-      setPanel({ ...panel, clase: claseActualizada });
-      setClases((prev) => prev.map((c) => c.id === panel.clase.id ? claseActualizada : c));
+      const res = await api.sesiones.cancelarSesion(claseId, fecha.toISOString(), 'Clase cancelada');
       showToast(`Clase cancelada · ${res.alumnosAfectados} alumno(s) con recuperación pendiente`);
-      await abrirModalHueco(`Clase cancelada: ${panel.clase.nombre}`, panel.clase.id);
+      await abrirModalHueco(`Clase cancelada: ${claseNombre}`, claseId);
+      api.clases.get(claseId).then((claseRefrescada) => {
+        api.listaEspera.list(claseId).then((le) => {
+          const claseActualizada = { ...claseRefrescada, listaEspera: le };
+          setPanel((prev) => prev ? { ...prev, clase: claseActualizada } : prev);
+          setClases((prev) => prev.map((c) => c.id === claseId ? claseActualizada : c));
+        });
+      }).catch(() => {});
     } catch (e: any) {
       showToast(e.message ?? 'Error al cancelar', false);
     }
