@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { UserPlus, Search, Pencil, Power, CheckCircle, Clock, Zap } from 'lucide-react';
+import { UserPlus, Search, Pencil, Power, CheckCircle, Clock, Zap, ChevronUp, ChevronDown } from 'lucide-react';
 import { alumnos as api } from '@/lib/api';
 import type { Alumno, Disponibilidad, ClaseDisponible } from '@/types';
 
@@ -28,7 +28,9 @@ export default function AlumnosPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [search, setSearch] = useState('');
-  const [filtroTab, setFiltroTab] = useState<'activos' | 'inactivos' | 'sin_clase'>('activos');
+  const [filtroActivo, setFiltroActivo] = useState(true);
+  const [sortCol, setSortCol] = useState<'alumno' | 'nivel' | 'disponibilidad' | 'clase' | 'recuperaciones'>('alumno');
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
   const [modal, setModal] = useState<{ open: boolean; data: Partial<Alumno>; editId?: string }>({
     open: false, data: EMPTY,
   });
@@ -46,10 +48,7 @@ export default function AlumnosPage() {
 
   const cargar = () => {
     setLoading(true);
-    const params: Record<string, string> = {};
-    if (filtroTab === 'activos') params.activo = 'true';
-    else if (filtroTab === 'inactivos') params.activo = 'false';
-    else { params.activo = 'true'; params.sinClase = 'true'; }
+    const params: Record<string, string> = { activo: String(filtroActivo) };
     if (search) params.search = search;
     api.list(params)
       .then(setLista)
@@ -57,7 +56,28 @@ export default function AlumnosPage() {
       .finally(() => setLoading(false));
   };
 
-  useEffect(() => { cargar(); }, [search, filtroTab]);
+  useEffect(() => { cargar(); }, [search, filtroActivo]);
+
+  const toggleSort = (col: typeof sortCol) => {
+    if (sortCol === col) setSortDir((d) => d === 'asc' ? 'desc' : 'asc');
+    else { setSortCol(col); setSortDir('asc'); }
+  };
+
+  const listaSorted = [...lista].sort((a, b) => {
+    let va: string | number = '';
+    let vb: string | number = '';
+    if (sortCol === 'alumno') { va = `${a.apellidos} ${a.nombre}`.toLowerCase(); vb = `${b.apellidos} ${b.nombre}`.toLowerCase(); }
+    else if (sortCol === 'nivel') { va = a.nivel; vb = b.nivel; }
+    else if (sortCol === 'disponibilidad') { va = a.disponibilidad; vb = b.disponibilidad; }
+    else if (sortCol === 'clase') {
+      va = (a.inscripciones?.filter((i) => i.activo).map((i) => i.clase.nombre).join('') ?? '').toLowerCase();
+      vb = (b.inscripciones?.filter((i) => i.activo).map((i) => i.clase.nombre).join('') ?? '').toLowerCase();
+    }
+    else if (sortCol === 'recuperaciones') { va = a._count?.recuperaciones ?? 0; vb = b._count?.recuperaciones ?? 0; }
+    if (va < vb) return sortDir === 'asc' ? -1 : 1;
+    if (va > vb) return sortDir === 'asc' ? 1 : -1;
+    return 0;
+  });
 
   const abrirNuevo = () => {
     setModal({ open: true, data: { ...EMPTY } });
@@ -173,13 +193,13 @@ export default function AlumnosPage() {
           />
         </div>
         <div className="flex gap-2">
-          {(['activos', 'inactivos', 'sin_clase'] as const).map((v) => (
+          {([true, false] as const).map((v) => (
             <button
-              key={v}
-              onClick={() => setFiltroTab(v)}
-              className={`btn ${filtroTab === v ? 'btn-primary' : 'btn-secondary'}`}
+              key={String(v)}
+              onClick={() => setFiltroActivo(v)}
+              className={`btn ${filtroActivo === v ? 'btn-primary' : 'btn-secondary'}`}
             >
-              {v === 'activos' ? 'Activos' : v === 'inactivos' ? 'Inactivos' : 'Sin clase'}
+              {v ? 'Activos' : 'Inactivos'}
             </button>
           ))}
         </div>
@@ -197,53 +217,76 @@ export default function AlumnosPage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-slate-50 border-b border-slate-100">
-                <th className="text-left px-5 py-3 font-semibold text-slate-500 text-xs uppercase">Alumno</th>
-                <th className="text-left px-3 py-3 font-semibold text-slate-500 text-xs uppercase">Nivel</th>
-                <th className="text-left px-3 py-3 font-semibold text-slate-500 text-xs uppercase">Disponibilidad</th>
-                <th className="text-left px-3 py-3 font-semibold text-slate-500 text-xs uppercase">Clase</th>
-                <th className="text-left px-3 py-3 font-semibold text-slate-500 text-xs uppercase">Recup. pend.</th>
+                {([
+                  ['alumno',         'Alumno',        'px-5'],
+                  ['nivel',          'Nivel',         'px-3'],
+                  ['disponibilidad', 'Disponibilidad','px-3'],
+                  ['clase',          'Clase',         'px-3'],
+                  ['recuperaciones', 'Recup. pend.',  'px-3'],
+                ] as const).map(([col, label, pad]) => (
+                  <th
+                    key={col}
+                    onClick={() => toggleSort(col)}
+                    className={`text-left ${pad} py-3 font-semibold text-slate-500 text-xs uppercase cursor-pointer select-none hover:text-slate-700 transition-colors`}
+                  >
+                    <span className="inline-flex items-center gap-1">
+                      {label}
+                      {sortCol === col
+                        ? sortDir === 'asc' ? <ChevronUp size={11} /> : <ChevronDown size={11} />
+                        : <ChevronDown size={11} className="opacity-20" />}
+                    </span>
+                  </th>
+                ))}
                 <th className="px-3 py-3" />
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50">
-              {lista.map((a) => (
-                <tr key={a.id} className="hover:bg-slate-50/60 transition-colors">
-                  <td className="px-5 py-3.5">
-                    <p className="font-semibold text-slate-800">{a.nombre} {a.apellidos}</p>
-                    <p className="text-xs text-slate-400">{a.email} · {a.telefono}</p>
-                  </td>
-                  <td className="px-3 py-3.5"><NivelBadge nivel={a.nivel} /></td>
-                  <td className="px-3 py-3.5">
-                    <span className={`badge ${DISPONIBILIDAD_BADGE[a.disponibilidad]}`}>
-                      {DISPONIBILIDAD_LABEL[a.disponibilidad]}
-                    </span>
-                  </td>
-                  <td className="px-3 py-3.5 text-slate-500 text-xs">
-                    {a.inscripciones && a.inscripciones.length > 0
-                      ? a.inscripciones.filter((i) => i.activo).map((i) => i.clase.nombre).join(', ')
-                      : <span className="text-slate-300">—</span>}
-                  </td>
-                  <td className="px-3 py-3.5">
-                    {a._count && a._count.recuperaciones > 0
-                      ? <span className="badge badge-yellow">{a._count.recuperaciones}</span>
-                      : <span className="text-slate-300 text-xs">—</span>}
-                  </td>
-                  <td className="px-3 py-3.5">
-                    <div className="flex gap-1 justify-end">
-                      <button onClick={() => abrirEditar(a)} className="btn btn-ghost p-2" title="Editar">
-                        <Pencil size={14} />
-                      </button>
-                      <button
-                        onClick={() => toggleActivo(a)}
-                        className={`btn btn-ghost p-2 ${a.activo ? 'text-slate-400' : 'text-emerald-500'}`}
-                        title={a.activo ? 'Desactivar' : 'Activar'}
-                      >
-                        <Power size={14} />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
+              {listaSorted.map((a) => {
+                const clasesActivas = a.inscripciones?.filter((i) => i.activo) ?? [];
+                const sinClase = clasesActivas.length === 0 && a.activo;
+                return (
+                  <tr key={a.id} className="hover:bg-slate-50/60 transition-colors">
+                    <td className="px-5 py-3.5">
+                      <p className="font-semibold text-slate-800">{a.nombre} {a.apellidos}</p>
+                      <p className="text-xs text-slate-400">{a.email} · {a.telefono}</p>
+                    </td>
+                    <td className="px-3 py-3.5"><NivelBadge nivel={a.nivel} /></td>
+                    <td className="px-3 py-3.5">
+                      <span className={`badge ${DISPONIBILIDAD_BADGE[a.disponibilidad]}`}>
+                        {DISPONIBILIDAD_LABEL[a.disponibilidad]}
+                      </span>
+                    </td>
+                    <td className="px-3 py-3.5 text-slate-500 text-xs">
+                      {sinClase
+                        ? <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-amber-100 text-amber-700">
+                            <Clock size={10} /> Lista de espera
+                          </span>
+                        : clasesActivas.length > 0
+                          ? clasesActivas.map((i) => i.clase.nombre).join(', ')
+                          : <span className="text-slate-300">—</span>}
+                    </td>
+                    <td className="px-3 py-3.5">
+                      {a._count && a._count.recuperaciones > 0
+                        ? <span className="badge badge-yellow">{a._count.recuperaciones}</span>
+                        : <span className="text-slate-300 text-xs">—</span>}
+                    </td>
+                    <td className="px-3 py-3.5">
+                      <div className="flex gap-1 justify-end">
+                        <button onClick={() => abrirEditar(a)} className="btn btn-ghost p-2" title="Editar">
+                          <Pencil size={14} />
+                        </button>
+                        <button
+                          onClick={() => toggleActivo(a)}
+                          className={`btn btn-ghost p-2 ${a.activo ? 'text-slate-400' : 'text-emerald-500'}`}
+                          title={a.activo ? 'Desactivar' : 'Activar'}
+                        >
+                          <Power size={14} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
