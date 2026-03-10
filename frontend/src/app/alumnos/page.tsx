@@ -112,6 +112,13 @@ export default function AlumnosPage() {
     }
   };
 
+  const campoDisponibilidad = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    setModal((m) => ({ ...m, data: { ...m.data, disponibilidad: e.target.value as Disponibilidad } }));
+    if (!modal.editId) setClaseSeleccionada('auto');
+  };
+
+  const esMañana = (hora: string) => parseInt(hora.split(':')[0], 10) < 14;
+
   const guardar = async () => {
     setSaving(true); setSaveError('');
     try {
@@ -348,7 +355,7 @@ export default function AlumnosPage() {
               </div>
               <div>
                 <label className="label">Disponibilidad</label>
-                <select className="input" value={modal.data.disponibilidad || 'FLEXIBLE'} onChange={campo('disponibilidad')}>
+                <select className="input" value={modal.data.disponibilidad || 'FLEXIBLE'} onChange={campoDisponibilidad}>
                   <option value="MANANA">Mañana</option>
                   <option value="TARDE">Tarde</option>
                   <option value="FLEXIBLE">Flexible</option>
@@ -359,7 +366,15 @@ export default function AlumnosPage() {
                 <textarea className="input h-20 resize-none" value={modal.data.notas || ''} onChange={campo('notas')} />
               </div>
 
-              {!modal.editId && (
+              {!modal.editId && (() => {
+                const disp = modal.data.disponibilidad || 'FLEXIBLE';
+                const clasesFiltradas = disp === 'MANANA'
+                  ? clasesDisponibles.filter((c) => esMañana(c.hora))
+                  : disp === 'TARDE'
+                  ? clasesDisponibles.filter((c) => !esMañana(c.hora))
+                  : clasesDisponibles;
+
+                return (
                 <div className="col-span-2">
                   <label className="label flex items-center gap-2">
                     Clase
@@ -385,20 +400,22 @@ export default function AlumnosPage() {
                     <div className="text-xs text-slate-400 text-center py-2">Cargando clases compatibles…</div>
                   )}
 
-                  {!loadingClases && clasesDisponibles.length === 0 && (
+                  {!loadingClases && clasesFiltradas.length === 0 && (
                     <div className="text-xs text-amber-600 bg-amber-50 px-3 py-2 rounded-lg">
-                      Sin clases compatibles con este nivel — el alumno irá a lista de espera general
+                      {clasesDisponibles.length > 0
+                        ? `Sin clases de ${disp === 'MANANA' ? 'mañana' : 'tarde'} para este nivel — cambia la disponibilidad o asigna manualmente`
+                        : 'Sin clases compatibles con este nivel — el alumno irá a lista de espera general'}
                     </div>
                   )}
 
                   {/* Clases con plaza libre */}
-                  {clasesDisponibles.filter((c) => c.plazasLibres > 0).length > 0 && (
+                  {clasesFiltradas.filter((c) => c.plazasLibres > 0).length > 0 && (
                     <>
                       <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2">
                         Con plaza libre
                       </p>
                       <div className="grid grid-cols-2 gap-2 mb-3">
-                        {clasesDisponibles
+                        {clasesFiltradas
                           .filter((c) => c.plazasLibres > 0)
                           .map((c) => (
                             <button
@@ -444,7 +461,8 @@ export default function AlumnosPage() {
                     );
                   })()}
                 </div>
-              )}
+                );
+              })()}
             </div>
 
             {saveError && (
