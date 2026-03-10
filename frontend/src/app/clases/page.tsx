@@ -100,6 +100,11 @@ export default function ClasesPage() {
   const NIVELES = [1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0];
 
   const [modalNueva, setModalNueva] = useState(false);
+  const [pasoNueva, setPasoNueva] = useState<'form' | 'candidatos'>('form');
+  const [clasesCreadas, setClasesCreadas] = useState<Clase[]>([]);
+  const [candidatosEspera, setCandidatosEspera] = useState<Alumno[]>([]);
+  const [selEspera, setSelEspera] = useState<Set<string>>(new Set());
+  const [inscribiendoEspera, setInscribiendoEspera] = useState(false);
   const [profesores, setProfesores] = useState<Profesor[]>([]);
   const [pistas, setPistas] = useState<Pista[]>([]);
   const [formClase, setFormClase] = useState({
@@ -117,6 +122,10 @@ export default function ClasesPage() {
 
   const abrirModalNueva = async () => {
     setErrorClase('');
+    setPasoNueva('form');
+    setClasesCreadas([]);
+    setCandidatosEspera([]);
+    setSelEspera(new Set());
     setFormClase({ nombre: '', nivelMin: 1.0, nivelMax: 2.0, profesorId: '', pistaId: '', diasSemana: ['LUNES'], horaInicio: '09:00', horaFin: '10:00', plazasTotal: 4, recurrencia: 'permanente', fechaFin: '' });
     const [profs, pts] = await Promise.all([profesoresApi.list(), pistasApi.list()]);
     setProfesores(profs.filter((p) => p.activo));
@@ -141,7 +150,7 @@ export default function ClasesPage() {
           : formClase.recurrencia === 'hasta_fecha' && formClase.fechaFin
           ? new Date(formClase.fechaFin).toISOString()
           : null;
-      await Promise.all(
+      const nuevas = await Promise.all(
         formClase.diasSemana.map((diaSemana) =>
           clasesApi.create({
             nombre: formClase.nombre, nivelMin: formClase.nivelMin, nivelMax: formClase.nivelMax,
@@ -154,15 +163,57 @@ export default function ClasesPage() {
       );
       const updated = await clasesApi.list({ activa: 'true' });
       setClases(updated);
-      setModalNueva(false);
-      const n = formClase.diasSemana.length;
-      setToast(`${n === 1 ? 'Clase creada' : `${n} clases creadas`} correctamente ✓`);
-      setTimeout(() => setToast(''), 3000);
+      // --- Buscar candidatos de lista de espera ---
+      const esMañana = (h: string) => parseInt(h.split(':')[0], 10) < 14;
+      const horaNum = parseInt(formClase.horaInicio.split(':')[0], 10);
+      const esTurnoMañana = horaNum < 14;
+      const sinClase = await alumnosApi.list({ activo: 'true', sinClase: 'true' } as any);
+      const candidatos = sinClase.filter((a) => {
+        if (a.nivel < formClase.nivelMin - 0.5 || a.nivel > formClase.nivelMax + 0.5) return false;
+        if (a.disponibilidad === 'FLEXIBLE') return true;
+        return esTurnoMañana ? a.disponibilidad === 'MANANA' : a.disponibilidad === 'TARDE';
+      });
+      setClasesCreadas(nuevas as Clase[]);
+      setCandidatosEspera(candidatos);
+      setSelEspera(new Set(candidatos.map((a) => a.id)));
+      if (candidatos.length > 0) {
+        setPasoNueva('candidatos');
+      } else {
+        setModalNueva(false);
+        const n = formClase.diasSemana.length;
+        setToast(`${n === 1 ? 'Clase creada' : `${n} clases creadas`} correctamente ✓`);
+        setTimeout(() => setToast(''), 3000);
+      }
     } catch (e: any) {
       setErrorClase(e.message ?? 'Error al crear la clase');
     } finally {
       setGuardandoClase(false);
     }
+  };
+
+  const inscribirDesdeEspera = async () => {
+    if (selEspera.size === 0 || clasesCreadas.length === 0) {
+      setModalNueva(false);
+      return;
+    }
+    setInscribiendoEspera(true);
+    const alumnoIds = Array.from(selEspera);
+    const clase = clasesCreadas[0]; // primera clase creada como destino principal
+    let inscritos = 0;
+    for (const alumnoId of alumnoIds) {
+      if (inscritos >= clase.plazasTotal) break;
+      try {
+        await clasesApi.inscribir(clase.id, alumnoId);
+        inscritos++;
+      } catch { /* plaza llena o error: continuar */ }
+    }
+    const updated = await clasesApi.list({ activa: 'true' });
+    setClases(updated);
+    setModalNueva(false);
+    const n = formClase.diasSemana.length;
+    setToast(`${n === 1 ? 'Clase creada' : `${n} clases creadas`} · ${inscritos} alumno(s) inscrito(s) ✓`);
+    setTimeout(() => setToast(''), 3500);
+    setInscribiendoEspera(false);
   };
 
   // ── Modal recuperación ──────────────────────────────────────────────────────
@@ -875,13 +926,23 @@ export default function ClasesPage() {
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
             {/* Header */}
             <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
-              <h2 className="text-lg font-black text-slate-800">Nueva clase</h2>
+              <div>
+                <h2 className="text-lg font-black text-slate-800">
+                  {pasoNueva === 'form' ? 'Nueva clase' : 'Alumnos en lista de espera'}
+                </h2>
+                {pasoNueva === 'candidatos' && (
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    {candidatosEspera.length} alumno{candidatosEspera.length !== 1 ? 's' : ''} sin clase compatibles con este horario y nivel
+                  </p>
+                )}
+              </div>
               <button onClick={() => setModalNueva(false)} className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400">
                 <X size={16} />
               </button>
             </div>
 
-            <div className="px-6 py-5 space-y-5">
+            {pasoNueva === 'form' ? (
+            <><div className="px-6 py-5 space-y-5">
               {/* Nombre */}
               <div>
                 <label className="label">Nombre de la clase</label>
@@ -1064,7 +1125,7 @@ export default function ClasesPage() {
               )}
             </div>
 
-            {/* Footer */}
+            {/* Footer paso 1 */}
             <div className="flex gap-2 px-6 py-4 border-t border-slate-100">
               <button
                 onClick={guardarClase}
@@ -1078,6 +1139,66 @@ export default function ClasesPage() {
                 Cancelar
               </button>
             </div>
+            </>) : (
+            <>
+              {/* Paso 2 — candidatos de lista de espera */}
+              <div className="px-6 py-5 space-y-2 max-h-[50vh] overflow-y-auto">
+                {candidatosEspera.length === 0 ? (
+                  <p className="text-sm text-slate-400 italic text-center py-4">No hay alumnos en lista de espera compatibles</p>
+                ) : candidatosEspera.map((a) => {
+                  const sel = selEspera.has(a.id);
+                  return (
+                    <label
+                      key={a.id}
+                      className="flex items-center gap-3 p-3 rounded-xl border-2 cursor-pointer transition-all"
+                      style={sel ? { borderColor: '#1e83ec', background: '#eff6ff' } : { borderColor: '#e2e8f0', background: '#f8fafc' }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={sel}
+                        onChange={() => setSelEspera((prev) => {
+                          const next = new Set(prev);
+                          if (next.has(a.id)) next.delete(a.id); else next.add(a.id);
+                          return next;
+                        })}
+                        className="w-4 h-4 accent-[#1e83ec]"
+                      />
+                      <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-xs font-black text-blue-700 shrink-0">
+                        {a.nombre[0]}{a.apellidos[0]}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-slate-800 truncate">{a.nombre} {a.apellidos}</p>
+                        <p className="text-xs text-slate-400">Niv. {a.nivel.toFixed(1)} · {a.disponibilidad === 'MANANA' ? 'Mañana' : a.disponibilidad === 'TARDE' ? 'Tarde' : 'Flexible'}</p>
+                      </div>
+                    </label>
+                  );
+                })}
+              </div>
+
+              {/* Info plazas */}
+              {clasesCreadas.length > 0 && selEspera.size > clasesCreadas[0].plazasTotal && (
+                <div className="mx-6 mb-3 flex items-center gap-2 text-xs text-amber-700 bg-amber-50 px-3 py-2 rounded-lg border border-amber-100">
+                  <AlertCircle size={13} />
+                  Solo hay {clasesCreadas[0].plazasTotal} plaza{clasesCreadas[0].plazasTotal !== 1 ? 's' : ''}. Los primeros {clasesCreadas[0].plazasTotal} seleccionados serán inscritos; el resto irá a lista de espera.
+                </div>
+              )}
+
+              {/* Footer paso 2 */}
+              <div className="flex gap-2 px-6 py-4 border-t border-slate-100">
+                <button
+                  onClick={inscribirDesdeEspera}
+                  disabled={inscribiendoEspera || selEspera.size === 0}
+                  className="btn btn-primary flex items-center gap-2 flex-1 justify-center disabled:opacity-50"
+                >
+                  {inscribiendoEspera ? <Loader2 size={15} className="animate-spin" /> : <UserPlus size={15} />}
+                  {selEspera.size > 0 ? `Inscribir ${selEspera.size} alumno${selEspera.size !== 1 ? 's' : ''}` : 'Inscribir seleccionados'}
+                </button>
+                <button onClick={() => setModalNueva(false)} className="btn btn-secondary">
+                  Saltar
+                </button>
+              </div>
+            </>
+            )}
           </div>
         </div>
       )}
