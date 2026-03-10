@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import * as api from '@/lib/api';
 import type { Clase, ListaEspera, Alumno, CandidatosHueco } from '@/types';
+import ModalNotificacion from '@/components/ModalNotificacion';
 
 // ── Colores por pista ──────────────────────────────────────────────────────────
 const PISTA_COLORS: Record<number, { bg: string; court: string; lines: string; text: string; badge: string }> = {
@@ -94,6 +95,7 @@ export default function PistasPage() {
   const [pistaConfig, setPistaConfig] = useState<Record<number, { id: string; nombre: string }>>({})
   const [confirmarNotificar, setConfirmarNotificar] = useState(false);
   const [confirmarCancelar, setConfirmarCancelar] = useState(false);
+  const [modalCanal, setModalCanal] = useState<{ count: number; context: 'espera' | 'candidatos' } | null>(null);
 
   // Modal de hueco / notificación de recuperación
   const [modalHueco, setModalHueco] = useState<{
@@ -218,16 +220,10 @@ export default function PistasPage() {
   };
 
   // Notificar a todos en lista de espera
-  const notificarTodos = async () => {
+  const notificarTodos = () => {
     if (!panel) return;
-    setProcesando('notificar');
-    try {
-      const res = await api.listaEspera.notificar(panel.clase.id);
-      showToast(`Notificados ${res.notificados} alumnos ✓`);
-    } catch {
-      showToast('Error al notificar', false);
-    }
-    setProcesando(null);
+    setConfirmarNotificar(false);
+    setModalCanal({ count: panel.clase.listaEspera?.length ?? 0, context: 'espera' });
   };
 
   // Registrar falta de un alumno y abrir modal de huecos
@@ -293,18 +289,9 @@ export default function PistasPage() {
   };
 
   // Notificar los seleccionados (crear notificaciones en BD)
-  const notificarSeleccionados = async () => {
+  const notificarSeleccionados = () => {
     if (!modalHueco || seleccionados.size === 0) return;
-    setEnviando(true);
-    try {
-      const alumnoIds = Array.from(seleccionados) as string[];
-      await api.notificaciones.notificarHueco(alumnoIds, modalHueco.claseId, fecha.toISOString());
-      showToast(`Notificados ${alumnoIds.length} alumno(s) ✓`);
-      setModalHueco(null);
-    } catch (e: any) {
-      showToast(e.message ?? 'Error al notificar', false);
-    }
-    setEnviando(false);
+    setModalCanal({ count: seleccionados.size, context: 'candidatos' });
   };
 
   const toggleSeleccionado = (alumnoId: string) => {
@@ -672,52 +659,16 @@ export default function PistasPage() {
                 </div>
               )}
 
-              {/* Notificar a todos — acción secundaria con confirmación */}
+              {/* Notificar a todos — sin confirmación previa, va directo al modal de canales */}
               {(panel.clase.listaEspera?.length ?? 0) > 0 && (
                 <div className="mt-3">
-                  {!confirmarNotificar ? (
-                    <button
-                      onClick={() => setConfirmarNotificar(true)}
-                      className="w-full flex items-center justify-center gap-1.5 text-xs font-semibold py-2 rounded-lg border border-slate-200 text-slate-500 hover:border-slate-300 hover:bg-slate-50 transition-colors"
-                    >
-                      <Bell size={12} />
-                      Notificar a todos en espera
-                    </button>
-                  ) : (
-                    <div className="rounded-lg border border-orange-200 bg-orange-50 p-3">
-                      <p className="text-xs font-semibold text-orange-800 mb-2">
-                        ⚠️ Se enviará email a {panel.clase.listaEspera!.length} alumno{panel.clase.listaEspera!.length > 1 ? 's' : ''}. ¿Confirmar?
-                      </p>
-                      <div className="flex gap-2">
-                        <button
-                          onClick={async () => {
-                            const res = await (async () => {
-                              setProcesando('notificar');
-                              try {
-                                return await api.listaEspera.notificar(panel.clase.id);
-                              } finally {
-                                setProcesando(null);
-                                setConfirmarNotificar(false);
-                              }
-                            })();
-                            if (res) showToast(`Notificados ${res.notificados} alumnos ✓`);
-                          }}
-                          disabled={procesando === 'notificar'}
-                          className="flex-1 flex items-center justify-center gap-1 px-2 py-1.5 rounded-lg text-xs font-bold text-white disabled:opacity-50"
-                          style={{ background: '#f97316' }}
-                        >
-                          {procesando === 'notificar' ? <Loader2 size={11} className="animate-spin" /> : <Bell size={11} />}
-                          Sí, notificar
-                        </button>
-                        <button
-                          onClick={() => setConfirmarNotificar(false)}
-                          className="flex-1 px-2 py-1.5 rounded-lg text-xs font-semibold border border-slate-200 text-slate-500 hover:bg-white"
-                        >
-                          Cancelar
-                        </button>
-                      </div>
-                    </div>
-                  )}
+                  <button
+                    onClick={() => setModalCanal({ count: panel.clase.listaEspera!.length, context: 'espera' })}
+                    className="w-full flex items-center justify-center gap-1.5 text-xs font-semibold py-2 rounded-lg border border-slate-200 text-slate-500 hover:border-slate-300 hover:bg-slate-50 transition-colors"
+                  >
+                    <Bell size={12} />
+                    Notificar a todos en espera
+                  </button>
                 </div>
               )}
 
@@ -876,6 +827,18 @@ export default function PistasPage() {
             </div>
           </div>
         </div>
+      )}
+      {/* ── Modal canal notificación ── */}
+      {modalCanal && (
+        <ModalNotificacion
+          count={modalCanal.count}
+          onConfirm={() => {
+            if (modalCanal.context === 'candidatos') setModalHueco(null);
+            showToast(`Notificados ${modalCanal.count} alumno(s) ✓`);
+            setModalCanal(null);
+          }}
+          onClose={() => setModalCanal(null)}
+        />
       )}
     </div>
   );

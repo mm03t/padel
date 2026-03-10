@@ -6,6 +6,7 @@ import { es } from 'date-fns/locale';
 import { ChevronLeft, ChevronRight, X, Users, AlertCircle, Check, Clock, Bell, UserPlus, CheckCircle, Loader2, UserMinus, AlertTriangle, Send, Plus } from 'lucide-react';
 import { clases as clasesApi, recuperaciones as recuperApi, listaEspera as listaEsperaApi, alumnos as alumnosApi, notificaciones as notifApi, profesores as profesoresApi, pistas as pistasApi } from '@/lib/api';
 import type { Clase, DiaSemana, ListaEspera, Alumno, CandidatosHueco, Profesor, Pista } from '@/types';
+import ModalNotificacion from '@/components/ModalNotificacion';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -112,6 +113,7 @@ export default function ClasesPage() {
   });
   const [guardandoClase, setGuardandoClase] = useState(false);
   const [errorClase, setErrorClase] = useState('');
+  const [modalCanal, setModalCanal] = useState<{ count: number; context: 'espera' | 'candidatos' } | null>(null);
 
   const abrirModalNueva = async () => {
     setErrorClase('');
@@ -183,20 +185,9 @@ export default function ClasesPage() {
     }
   };
 
-  const notificarSeleccionadosMod = async () => {
+  const notificarSeleccionadosMod = () => {
     if (!modalCandidatos || seleccionadosMod.size === 0) return;
-    setEnviandoMod(true);
-    try {
-      const alumnoIds = Array.from(seleccionadosMod) as string[];
-      await notifApi.notificarHueco(alumnoIds, modalCandidatos.claseId, fechaMod);
-      setToast(`Notificados ${alumnoIds.length} alumno(s) ✓`);
-      setTimeout(() => setToast(''), 3500);
-      setModalCandidatos(null);
-    } catch (e: any) {
-      setToast(e.message ?? 'Error al notificar');
-      setTimeout(() => setToast(''), 3500);
-    }
-    setEnviandoMod(false);
+    setModalCanal({ count: seleccionadosMod.size, context: 'candidatos' });
   };
 
   const toggleSelecMod = (alumnoId: string) => {
@@ -587,18 +578,7 @@ export default function ClasesPage() {
                 </span>
                 {(panel.listaEspera?.length ?? 0) > 0 && (
                   <button
-                    onClick={async () => {
-                      setProcesandoEspera('notificar');
-                      try {
-                        const res = await listaEsperaApi.notificar(panel.clase.id);
-                        setToast(`Notificados ${res.notificados} alumnos ✓`);
-                        setTimeout(() => setToast(''), 3500);
-                      } catch {
-                        setToast('Error al notificar');
-                        setTimeout(() => setToast(''), 3500);
-                      }
-                      setProcesandoEspera(null);
-                    }}
+                    onClick={() => setModalCanal({ count: panel.listaEspera?.length ?? 0, context: 'espera' })}
                     disabled={procesandoEspera === 'notificar'}
                     className="flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-lg text-white disabled:opacity-50"
                     style={{ background: '#1e83ec' }}
@@ -862,6 +842,20 @@ export default function ClasesPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* ── Modal canal notificación ── */}
+      {modalCanal && (
+        <ModalNotificacion
+          count={modalCanal.count}
+          onConfirm={() => {
+            if (modalCanal.context === 'candidatos') setModalCandidatos(null);
+            setToast(`Notificados ${modalCanal.count} alumno(s) ✓`);
+            setTimeout(() => setToast(''), 3500);
+            setModalCanal(null);
+          }}
+          onClose={() => setModalCanal(null)}
+        />
       )}
 
       {/* ── Toast ── */}
