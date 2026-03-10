@@ -3,9 +3,9 @@
 import { useEffect, useState, useCallback } from 'react';
 import { format, getDaysInMonth, startOfMonth, getDay } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { ChevronLeft, ChevronRight, X, Users, AlertCircle, Check, Clock, Bell, UserPlus, CheckCircle, Loader2, UserMinus, AlertTriangle, Send } from 'lucide-react';
-import { clases as clasesApi, recuperaciones as recuperApi, listaEspera as listaEsperaApi, alumnos as alumnosApi, notificaciones as notifApi } from '@/lib/api';
-import type { Clase, DiaSemana, ListaEspera, Alumno, CandidatosHueco } from '@/types';
+import { ChevronLeft, ChevronRight, X, Users, AlertCircle, Check, Clock, Bell, UserPlus, CheckCircle, Loader2, UserMinus, AlertTriangle, Send, Plus } from 'lucide-react';
+import { clases as clasesApi, recuperaciones as recuperApi, listaEspera as listaEsperaApi, alumnos as alumnosApi, notificaciones as notifApi, profesores as profesoresApi, pistas as pistasApi } from '@/lib/api';
+import type { Clase, DiaSemana, ListaEspera, Alumno, CandidatosHueco, Profesor, Pista } from '@/types';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -80,6 +80,62 @@ export default function ClasesPage() {
   const [todosAlumnos, setTodosAlumnos] = useState<Alumno[]>([]);
   const [buscarEspera, setBuscarEspera] = useState('');
   const [procesandoEspera, setProcesandoEspera] = useState<string | null>(null);
+
+  // ── Modal nueva clase ──────────────────────────────────────────────────────
+  const DIAS_SEMANA: { value: DiaSemana; label: string }[] = [
+    { value: 'LUNES',     label: 'Lun' },
+    { value: 'MARTES',    label: 'Mar' },
+    { value: 'MIERCOLES', label: 'Mié' },
+    { value: 'JUEVES',    label: 'Jue' },
+    { value: 'VIERNES',   label: 'Vie' },
+    { value: 'SABADO',    label: 'Sáb' },
+    { value: 'DOMINGO',   label: 'Dom' },
+  ];
+  const NIVELES = [1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0];
+
+  const [modalNueva, setModalNueva] = useState(false);
+  const [profesores, setProfesores] = useState<Profesor[]>([]);
+  const [pistas, setPistas] = useState<Pista[]>([]);
+  const [formClase, setFormClase] = useState({
+    nombre: '', nivelMin: 1.0, nivelMax: 2.0,
+    profesorId: '', pistaId: '',
+    diaSemana: 'LUNES' as DiaSemana,
+    horaInicio: '09:00', horaFin: '10:00',
+    plazasTotal: 4,
+  });
+  const [guardandoClase, setGuardandoClase] = useState(false);
+  const [errorClase, setErrorClase] = useState('');
+
+  const abrirModalNueva = async () => {
+    setErrorClase('');
+    setFormClase({ nombre: '', nivelMin: 1.0, nivelMax: 2.0, profesorId: '', pistaId: '', diaSemana: 'LUNES', horaInicio: '09:00', horaFin: '10:00', plazasTotal: 4 });
+    const [profs, pts] = await Promise.all([profesoresApi.list(), pistasApi.list()]);
+    setProfesores(profs.filter((p) => p.activo));
+    setPistas(pts.filter((p) => p.activa));
+    if (profs.length > 0) setFormClase((f) => ({ ...f, profesorId: profs[0].id }));
+    if (pts.length > 0) setFormClase((f) => ({ ...f, pistaId: pts[0].id }));
+    setModalNueva(true);
+  };
+
+  const guardarClase = async () => {
+    if (!formClase.nombre.trim()) { setErrorClase('El nombre es obligatorio'); return; }
+    if (!formClase.profesorId) { setErrorClase('Selecciona un profesor'); return; }
+    if (!formClase.pistaId) { setErrorClase('Selecciona una pista'); return; }
+    if (formClase.nivelMin >= formClase.nivelMax) { setErrorClase('El nivel mínimo debe ser menor que el máximo'); return; }
+    setGuardandoClase(true); setErrorClase('');
+    try {
+      await clasesApi.create(formClase);
+      const updated = await clasesApi.list({ activa: 'true' });
+      setClases(updated);
+      setModalNueva(false);
+      setToast('Clase creada correctamente ✓');
+      setTimeout(() => setToast(''), 3000);
+    } catch (e: any) {
+      setErrorClase(e.message ?? 'Error al crear la clase');
+    } finally {
+      setGuardandoClase(false);
+    }
+  };
 
   // ── Modal recuperación ──────────────────────────────────────────────────────
   const [modalCandidatos, setModalCandidatos] = useState<{
@@ -264,6 +320,9 @@ export default function ClasesPage() {
             </button>
             <button onClick={() => navMes(1)} className="btn btn-secondary px-2 py-2">
               <ChevronRight size={16} />
+            </button>
+            <button onClick={abrirModalNueva} className="btn btn-primary flex items-center gap-1.5 ml-2">
+              <Plus size={15} /> Nueva clase
             </button>
           </div>
         </div>
@@ -787,6 +846,164 @@ export default function ClasesPage() {
         >
           <Check size={15} />
           {toast}
+        </div>
+      )}
+
+      {/* ── Modal Nueva Clase ── */}
+      {modalNueva && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+            {/* Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+              <h2 className="text-lg font-black text-slate-800">Nueva clase</h2>
+              <button onClick={() => setModalNueva(false)} className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400">
+                <X size={16} />
+              </button>
+            </div>
+
+            <div className="px-6 py-5 space-y-5">
+              {/* Nombre */}
+              <div>
+                <label className="label">Nombre de la clase</label>
+                <input
+                  className="input"
+                  placeholder="ej. Iniciación Mañana"
+                  value={formClase.nombre}
+                  onChange={(e) => setFormClase((f) => ({ ...f, nombre: e.target.value }))}
+                />
+              </div>
+
+              {/* Niveles */}
+              <div>
+                <label className="label">Rango de nivel</label>
+                <div className="flex items-center gap-3">
+                  <select
+                    className="input flex-1"
+                    value={formClase.nivelMin}
+                    onChange={(e) => setFormClase((f) => ({ ...f, nivelMin: parseFloat(e.target.value) }))}
+                  >
+                    {NIVELES.map((n) => <option key={n} value={n}>Niv. {n.toFixed(1)}</option>)}
+                  </select>
+                  <span className="text-slate-400 text-sm font-semibold shrink-0">hasta</span>
+                  <select
+                    className="input flex-1"
+                    value={formClase.nivelMax}
+                    onChange={(e) => setFormClase((f) => ({ ...f, nivelMax: parseFloat(e.target.value) }))}
+                  >
+                    {NIVELES.map((n) => <option key={n} value={n}>Niv. {n.toFixed(1)}</option>)}
+                  </select>
+                </div>
+              </div>
+
+              {/* Profesor */}
+              <div>
+                <label className="label">Profesor</label>
+                <select
+                  className="input"
+                  value={formClase.profesorId}
+                  onChange={(e) => setFormClase((f) => ({ ...f, profesorId: e.target.value }))}
+                >
+                  {profesores.map((p) => (
+                    <option key={p.id} value={p.id}>{p.nombre} {p.apellidos}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Pista */}
+              <div>
+                <label className="label">Pista</label>
+                <select
+                  className="input"
+                  value={formClase.pistaId}
+                  onChange={(e) => setFormClase((f) => ({ ...f, pistaId: e.target.value }))}
+                >
+                  {pistas.map((p) => (
+                    <option key={p.id} value={p.id}>Pista {p.numero} — {p.nombre}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Día de la semana */}
+              <div>
+                <label className="label">Día de la semana</label>
+                <div className="flex gap-1.5 flex-wrap">
+                  {DIAS_SEMANA.map((d) => (
+                    <button
+                      key={d.value}
+                      type="button"
+                      onClick={() => setFormClase((f) => ({ ...f, diaSemana: d.value }))}
+                      className="w-11 h-11 rounded-xl text-sm font-bold border-2 transition-all"
+                      style={formClase.diaSemana === d.value
+                        ? { background: '#1e83ec', color: '#fff', borderColor: '#1e83ec' }
+                        : { background: '#f8fafc', color: '#64748b', borderColor: '#e2e8f0' }}
+                    >
+                      {d.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Horario */}
+              <div>
+                <label className="label">Horario</label>
+                <div className="flex items-center gap-3">
+                  <input
+                    type="time"
+                    className="input flex-1"
+                    value={formClase.horaInicio}
+                    onChange={(e) => setFormClase((f) => ({ ...f, horaInicio: e.target.value }))}
+                  />
+                  <span className="text-slate-400 text-sm font-semibold shrink-0">a</span>
+                  <input
+                    type="time"
+                    className="input flex-1"
+                    value={formClase.horaFin}
+                    onChange={(e) => setFormClase((f) => ({ ...f, horaFin: e.target.value }))}
+                  />
+                </div>
+              </div>
+
+              {/* Plazas */}
+              <div>
+                <label className="label">Plazas disponibles</label>
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setFormClase((f) => ({ ...f, plazasTotal: Math.max(1, f.plazasTotal - 1) }))}
+                    className="w-10 h-10 rounded-xl border-2 border-slate-200 bg-slate-50 text-slate-600 font-bold text-lg hover:border-slate-300"
+                  >−</button>
+                  <span className="text-2xl font-black text-slate-800 w-8 text-center">{formClase.plazasTotal}</span>
+                  <button
+                    type="button"
+                    onClick={() => setFormClase((f) => ({ ...f, plazasTotal: Math.min(12, f.plazasTotal + 1) }))}
+                    className="w-10 h-10 rounded-xl border-2 border-slate-200 bg-slate-50 text-slate-600 font-bold text-lg hover:border-slate-300"
+                  >+</button>
+                </div>
+              </div>
+
+              {/* Error */}
+              {errorClase && (
+                <div className="flex items-center gap-2 text-sm text-rose-600 bg-rose-50 px-3 py-2 rounded-lg border border-rose-100">
+                  <AlertCircle size={14} /> {errorClase}
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="flex gap-2 px-6 py-4 border-t border-slate-100">
+              <button
+                onClick={guardarClase}
+                disabled={guardandoClase}
+                className="btn btn-primary flex items-center gap-2 flex-1 justify-center"
+              >
+                {guardandoClase ? <Loader2 size={15} className="animate-spin" /> : <CheckCircle size={15} />}
+                Crear clase
+              </button>
+              <button onClick={() => setModalNueva(false)} className="btn btn-secondary">
+                Cancelar
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
