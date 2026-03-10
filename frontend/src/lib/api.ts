@@ -69,6 +69,9 @@ export const clases = {
   get: (id: string) => req<Clase>(`/clases/${id}`),
   create: (data: Partial<Clase>) =>
     req<Clase>('/clases', { method: 'POST', body: JSON.stringify(data) }),
+  update: (id: string, data: Partial<Clase>) =>
+    req<Clase>(`/clases/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  purge: (id: string) => req<{ ok: boolean }>(`/clases/${id}/purge`, { method: 'DELETE' }),
   inscribir: (claseId: string, alumnoId: string) =>
     req(`/clases/${claseId}/inscribir`, { method: 'POST', body: JSON.stringify({ alumnoId }) }),
   desinscribir: (claseId: string, alumnoId: string) =>

@@ -40,6 +40,8 @@ export default function ListaEsperaPage() {
   const [asignandoId, setAsignandoId] = useState<string | null>(null);
   const [clasesParaAsignar, setClasesParaAsignar] = useState<ClaseDisponible[]>([]);
   const [cargandoClases, setCargandoClases] = useState(false);
+  const [confirmarBorrarSP, setConfirmarBorrarSP] = useState<Alumno | null>(null);
+  const [borrandoSP, setBorrandoSP] = useState(false);
 
   const showToast = (msg: string) => {
     setToast(msg);
@@ -76,6 +78,19 @@ export default function ListaEsperaPage() {
     } finally {
       setCargandoClases(false);
     }
+  };
+
+  const borrarAlumnoSinPlaza = async (a: Alumno) => {
+    setBorrandoSP(true);
+    try {
+      await alumnosApi.purge(a.id);
+      setAlumnosSinPlaza((prev: Alumno[]) => prev.filter((x: Alumno) => x.id !== a.id));
+      setConfirmarBorrarSP(null);
+      showToast(`${a.nombre} ${a.apellidos} eliminado permanentemente`);
+    } catch {
+      showToast('Error al eliminar el alumno');
+    }
+    setBorrandoSP(false);
   };
 
   const confirmarAsignacion = async (claseId: string, alumnoId: string) => {
@@ -333,16 +348,25 @@ export default function ListaEsperaPage() {
                     )}
                   </div>
 
-                  {/* Botón asignar */}
+                  {/* Botones asignar + borrar */}
                   {asignandoId !== a.id && (
-                    <button
-                      onClick={() => iniciarAsignacion(a)}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-white shrink-0"
-                      style={{ background: '#1e83ec' }}
-                    >
-                      <CheckCircle size={12} />
-                      Asignar clase
-                    </button>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <button
+                        onClick={() => iniciarAsignacion(a)}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-white"
+                        style={{ background: '#1e83ec' }}
+                      >
+                        <CheckCircle size={12} />
+                        Asignar clase
+                      </button>
+                      <button
+                        onClick={() => setConfirmarBorrarSP(a)}
+                        className="p-1.5 rounded-lg text-slate-300 hover:text-rose-500 hover:bg-rose-50 transition-colors"
+                        title="Eliminar permanentemente"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
                   )}
                 </div>
               ))}
@@ -548,6 +572,43 @@ export default function ListaEsperaPage() {
           </div>
         )}
       </div>
+      )}
+
+      {/* Modal confirmación borrar alumno sin plaza */}
+      {confirmarBorrarSP && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-full bg-rose-100 flex items-center justify-center shrink-0">
+                <Trash2 size={18} className="text-rose-600" />
+              </div>
+              <div>
+                <h3 className="font-black text-slate-800">¿Eliminar alumno?</h3>
+                <p className="text-xs text-slate-400 mt-0.5">Esta acción no se puede deshacer</p>
+              </div>
+            </div>
+            <p className="text-sm text-slate-600 mb-5">
+              Se eliminarán permanentemente todos los datos de{' '}
+              <strong>{confirmarBorrarSP.nombre} {confirmarBorrarSP.apellidos}</strong>: historial, asistencias, recuperaciones y pagos.
+            </p>
+            <div className="flex gap-2">
+              <button
+                onClick={() => borrarAlumnoSinPlaza(confirmarBorrarSP)}
+                disabled={borrandoSP}
+                className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-bold text-white bg-rose-500 hover:bg-rose-600 disabled:opacity-50"
+              >
+                {borrandoSP ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                Eliminar
+              </button>
+              <button
+                onClick={() => setConfirmarBorrarSP(null)}
+                className="flex-1 py-2.5 rounded-xl text-sm font-semibold border border-slate-200 text-slate-600 hover:bg-slate-50"
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

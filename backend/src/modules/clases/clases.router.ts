@@ -170,6 +170,31 @@ router.post('/:id/sesion', async (req: Request, res: Response) => {
   }
 });
 
+// DELETE /api/clases/:id/purge — elimina la clase y todos sus datos asociados
+router.delete('/:id/purge', async (req: Request, res: Response) => {
+  try {
+    const id = req.params.id;
+    // sesionIds para cascada
+    const sesiones = await prisma.sesion.findMany({ where: { claseId: id }, select: { id: true } });
+    const sesionIds = sesiones.map((s) => s.id);
+    // recuperaciones que referencian sesiones de esta clase
+    await prisma.recuperacion.deleteMany({ where: { sesionOrigenId: { in: sesionIds } } });
+    await prisma.recuperacion.deleteMany({ where: { sesionRecuperacionId: { in: sesionIds } } });
+    // asistencias
+    await prisma.asistencia.deleteMany({ where: { sesionId: { in: sesionIds } } });
+    // sesiones
+    await prisma.sesion.deleteMany({ where: { claseId: id } });
+    // lista espera e inscripciones
+    await prisma.listaEspera.deleteMany({ where: { claseId: id } });
+    await prisma.alumnoClase.deleteMany({ where: { claseId: id } });
+    // clase
+    await prisma.clase.delete({ where: { id } });
+    res.json({ ok: true });
+  } catch (error: any) {
+    res.status(500).json({ error: 'Error al eliminar la clase' });
+  }
+});
+
 // GET /api/clases/pistas/todas
 router.get('/pistas/todas', async (_req: Request, res: Response) => {
   try {

@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { format, getDaysInMonth, startOfMonth, getDay } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { ChevronLeft, ChevronRight, X, Users, AlertCircle, Check, Clock, Bell, UserPlus, CheckCircle, Loader2, UserMinus, AlertTriangle, Send, Plus } from 'lucide-react';
+import { ChevronLeft, ChevronRight, X, Users, AlertCircle, Check, Clock, Bell, UserPlus, CheckCircle, Loader2, UserMinus, AlertTriangle, Send, Plus, Trash2, List, CalendarDays, Trophy } from 'lucide-react';
 import { clases as clasesApi, recuperaciones as recuperApi, listaEspera as listaEsperaApi, alumnos as alumnosApi, notificaciones as notifApi, profesores as profesoresApi, pistas as pistasApi } from '@/lib/api';
 import type { Clase, DiaSemana, ListaEspera, Alumno, CandidatosHueco, Profesor, Pista } from '@/types';
 import ModalNotificacion from '@/components/ModalNotificacion';
@@ -119,6 +119,49 @@ export default function ClasesPage() {
   const [guardandoClase, setGuardandoClase] = useState(false);
   const [errorClase, setErrorClase] = useState('');
   const [modalCanal, setModalCanal] = useState<{ count: number; context: 'espera' | 'candidatos' } | null>(null);
+
+  // ── Vista listado + eliminar clase ────────────────────────────────────────
+  const [vista, setVista] = useState<'calendario' | 'listado'>('calendario');
+  const [confirmarEliminarClase, setConfirmarEliminarClase] = useState<Clase | null>(null);
+  const [eliminandoClase, setEliminandoClase] = useState(false);
+
+  const getFinSemana = () => {
+    const hoy = new Date();
+    const dia = hoy.getDay();
+    const diasHastaDomingo = dia === 0 ? 0 : 7 - dia;
+    const fin = new Date(hoy);
+    fin.setDate(hoy.getDate() + diasHastaDomingo);
+    fin.setHours(23, 59, 59, 999);
+    return fin;
+  };
+
+  const getFinMes = () => {
+    const hoy = new Date();
+    return new Date(hoy.getFullYear(), hoy.getMonth() + 1, 0, 23, 59, 59, 999);
+  };
+
+  const eliminarClase = async (tipo: 'semana' | 'mes' | 'definitiva') => {
+    if (!confirmarEliminarClase) return;
+    setEliminandoClase(true);
+    try {
+      if (tipo === 'definitiva') {
+        await clasesApi.purge(confirmarEliminarClase.id);
+        setClases((prev) => prev.filter((c) => c.id !== confirmarEliminarClase.id));
+      } else {
+        const fechaFin = tipo === 'semana' ? getFinSemana() : getFinMes();
+        const updated = await clasesApi.update(confirmarEliminarClase.id, { fechaFin: fechaFin.toISOString() } as any);
+        setClases((prev) => prev.map((c) => c.id === updated.id ? { ...c, fechaFin: updated.fechaFin } : c));
+      }
+      setConfirmarEliminarClase(null);
+      const label = tipo === 'semana' ? 'hasta esta semana' : tipo === 'mes' ? 'hasta fin de mes' : 'definitivamente';
+      setToast(`Clase eliminada ${label} ✓`);
+      setTimeout(() => setToast(''), 3000);
+    } catch {
+      setToast('Error al eliminar la clase');
+      setTimeout(() => setToast(''), 3000);
+    }
+    setEliminandoClase(false);
+  };
 
   const abrirModalNueva = async () => {
     setErrorClase('');
@@ -373,29 +416,126 @@ export default function ClasesPage() {
         {/* Header */}
         <div className="flex items-center justify-between mb-5">
           <div>
-            <h1 className="text-2xl font-black text-slate-800 capitalize">{mesLabel}</h1>
-            <p className="text-sm text-slate-400 mt-0.5">{clases.length} clases activas · Haz clic en una clase para ver detalles</p>
+            <h1 className="text-2xl font-black text-slate-800 capitalize">
+              {vista === 'calendario' ? mesLabel : 'Listado de clases'}
+            </h1>
+            <p className="text-sm text-slate-400 mt-0.5">{clases.length} clases activas · {vista === 'calendario' ? 'Haz clic en una clase para ver detalles' : 'Gestiona y elimina clases'}</p>
           </div>
           <div className="flex items-center gap-2">
-            <button onClick={() => navMes(-1)} className="btn btn-secondary px-2 py-2">
-              <ChevronLeft size={16} />
-            </button>
-            <button
-              onClick={() => { setMes(hoy.getMonth() + 1); setAño(hoy.getFullYear()); }}
-              className="btn btn-secondary text-xs"
-            >
-              Hoy
-            </button>
-            <button onClick={() => navMes(1)} className="btn btn-secondary px-2 py-2">
-              <ChevronRight size={16} />
-            </button>
+            {/* Toggle vista */}
+            <div className="flex rounded-lg border border-slate-200 overflow-hidden">
+              <button
+                onClick={() => setVista('calendario')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold transition-colors ${
+                  vista === 'calendario' ? 'bg-[#1e83ec] text-white' : 'bg-white text-slate-500 hover:bg-slate-50'
+                }`}
+              >
+                <CalendarDays size={13} /> Calendario
+              </button>
+              <button
+                onClick={() => setVista('listado')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold transition-colors border-l border-slate-200 ${
+                  vista === 'listado' ? 'bg-[#1e83ec] text-white' : 'bg-white text-slate-500 hover:bg-slate-50'
+                }`}
+              >
+                <List size={13} /> Listado
+              </button>
+            </div>
+            {vista === 'calendario' && (
+              <>
+                <button onClick={() => navMes(-1)} className="btn btn-secondary px-2 py-2">
+                  <ChevronLeft size={16} />
+                </button>
+                <button
+                  onClick={() => { setMes(hoy.getMonth() + 1); setAño(hoy.getFullYear()); }}
+                  className="btn btn-secondary text-xs"
+                >
+                  Hoy
+                </button>
+                <button onClick={() => navMes(1)} className="btn btn-secondary px-2 py-2">
+                  <ChevronRight size={16} />
+                </button>
+              </>
+            )}
             <button onClick={abrirModalNueva} className="btn btn-primary flex items-center gap-1.5 ml-2">
               <Plus size={15} /> Nueva clase
             </button>
           </div>
         </div>
 
+        {/* ── Listado ── */}
+        {vista === 'listado' && (
+          <div className="card overflow-hidden mb-6">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-slate-50 border-b border-slate-100">
+                  <th className="px-4 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wide">Clase</th>
+                  <th className="px-3 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wide">Horario</th>
+                  <th className="px-3 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wide">Profesor</th>
+                  <th className="px-3 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wide">Nivel</th>
+                  <th className="px-3 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wide">Plazas</th>
+                  <th className="px-3 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wide">Fin</th>
+                  <th className="px-3 py-3" />
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-50">
+                {[...clases].sort((a, b) => {
+                  const dias = ['LUNES','MARTES','MIERCOLES','JUEVES','VIERNES','SABADO','DOMINGO'];
+                  return dias.indexOf(a.diaSemana) - dias.indexOf(b.diaSemana) || a.horaInicio.localeCompare(b.horaInicio);
+                }).map((c) => {
+                  const pal = getProfPalette(c.profesorId, profesorIds);
+                  const activos = c.inscripciones.filter((i) => i.activo).length;
+                  const DIA_LABEL: Record<string, string> = { LUNES:'Lun', MARTES:'Mar', MIERCOLES:'Mié', JUEVES:'Jue', VIERNES:'Vie', SABADO:'Sáb', DOMINGO:'Dom' };
+                  return (
+                    <tr key={c.id} className="hover:bg-slate-50/60 transition-colors">
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-2">
+                          <span className="w-2 h-2 rounded-full shrink-0" style={{ background: pal.dot }} />
+                          <span className="font-semibold text-slate-800">{c.nombre}</span>
+                        </div>
+                      </td>
+                      <td className="px-3 py-3 text-slate-600">
+                        <span className="font-medium">{DIA_LABEL[c.diaSemana]}</span> · {c.horaInicio}–{c.horaFin}
+                      </td>
+                      <td className="px-3 py-3 text-slate-500 text-xs">
+                        {c.profesor.nombre} {c.profesor.apellidos}
+                      </td>
+                      <td className="px-3 py-3">
+                        <span className="inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">
+                          <Trophy size={10} /> {c.nivelMin}–{c.nivelMax}
+                        </span>
+                      </td>
+                      <td className="px-3 py-3">
+                        <span className={`text-xs font-semibold ${
+                          activos >= c.plazasTotal ? 'text-red-500' : activos >= c.plazasTotal * 0.75 ? 'text-amber-600' : 'text-emerald-600'
+                        }`}>
+                          {activos}/{c.plazasTotal}
+                        </span>
+                      </td>
+                      <td className="px-3 py-3 text-xs text-slate-400">
+                        {c.fechaFin
+                          ? <span className="text-amber-600 font-medium">{format(new Date(c.fechaFin), 'd MMM yy', { locale: es })}</span>
+                          : <span className="text-slate-300">—</span>}
+                      </td>
+                      <td className="px-3 py-3">
+                        <button
+                          onClick={() => setConfirmarEliminarClase(c)}
+                          className="p-1.5 rounded-lg text-slate-300 hover:text-rose-500 hover:bg-rose-50 transition-colors"
+                          title="Eliminar clase"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+
         {/* Leyenda profesores */}
+        {vista === 'calendario' && (
         <div className="flex flex-wrap gap-2 mb-5">
           {[...new Map(clases.map((c) => [c.profesorId, c.profesor])).values()].map((prof) => {
             const pal = getProfPalette(prof.id, profesorIds);
@@ -411,8 +551,10 @@ export default function ClasesPage() {
             );
           })}
         </div>
+        )}
 
         {/* Calendario */}
+        {vista === 'calendario' && (
         <div className="card overflow-hidden">
           {/* Cabecera días semana */}
           <div className="grid grid-cols-7 bg-slate-50 border-b border-slate-100">
@@ -484,6 +626,7 @@ export default function ClasesPage() {
             </div>
           ))}
         </div>
+        )}
       </div>
 
       {/* ── Panel lateral ── */}
@@ -1199,6 +1342,68 @@ export default function ClasesPage() {
               </div>
             </>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* ── Modal eliminar clase ── */}
+      {confirmarEliminarClase && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-full bg-rose-100 flex items-center justify-center shrink-0">
+                <Trash2 size={18} className="text-rose-600" />
+              </div>
+              <div>
+                <h3 className="font-black text-slate-800">Eliminar clase</h3>
+                <p className="text-xs text-slate-400 mt-0.5 font-medium">{confirmarEliminarClase.nombre}</p>
+              </div>
+            </div>
+            <p className="text-sm text-slate-600 mb-5">¿Hasta cuándo quieres eliminar esta clase?</p>
+            <div className="flex flex-col gap-2">
+              <button
+                onClick={() => eliminarClase('semana')}
+                disabled={eliminandoClase}
+                className="flex items-center gap-2 px-4 py-3 rounded-xl text-sm font-semibold border border-slate-200 text-slate-700 hover:border-amber-300 hover:bg-amber-50 disabled:opacity-50 transition-colors text-left"
+              >
+                <span className="w-7 h-7 rounded-full bg-amber-100 flex items-center justify-center shrink-0 text-amber-700 text-xs font-black">1s</span>
+                <div>
+                  <p className="font-bold">Esta semana</p>
+                  <p className="text-xs text-slate-400">La clase finaliza el próximo domingo</p>
+                </div>
+              </button>
+              <button
+                onClick={() => eliminarClase('mes')}
+                disabled={eliminandoClase}
+                className="flex items-center gap-2 px-4 py-3 rounded-xl text-sm font-semibold border border-slate-200 text-slate-700 hover:border-blue-300 hover:bg-blue-50 disabled:opacity-50 transition-colors text-left"
+              >
+                <span className="w-7 h-7 rounded-full bg-blue-100 flex items-center justify-center shrink-0 text-blue-700 text-xs font-black">1m</span>
+                <div>
+                  <p className="font-bold">Este mes</p>
+                  <p className="text-xs text-slate-400">La clase finaliza el último día del mes</p>
+                </div>
+              </button>
+              <button
+                onClick={() => eliminarClase('definitiva')}
+                disabled={eliminandoClase}
+                className="flex items-center gap-2 px-4 py-3 rounded-xl text-sm font-bold border border-rose-200 text-rose-700 hover:bg-rose-50 disabled:opacity-50 transition-colors text-left"
+              >
+                {eliminandoClase
+                  ? <Loader2 size={14} className="animate-spin ml-1.5" />
+                  : <span className="w-7 h-7 rounded-full bg-rose-100 flex items-center justify-center shrink-0"><Trash2 size={13} className="text-rose-600" /></span>
+                }
+                <div>
+                  <p className="font-bold">Definitivamente</p>
+                  <p className="text-xs text-rose-400">Elimina la clase y todos sus datos</p>
+                </div>
+              </button>
+            </div>
+            <button
+              onClick={() => setConfirmarEliminarClase(null)}
+              className="mt-3 w-full py-2 rounded-xl text-sm font-semibold border border-slate-200 text-slate-500 hover:bg-slate-50"
+            >
+              Cancelar
+            </button>
           </div>
         </div>
       )}
