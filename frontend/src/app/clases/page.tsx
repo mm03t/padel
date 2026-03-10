@@ -48,8 +48,13 @@ function getCalendarWeeks(mes: number, año: number): (number | null)[][] {
   return weeks;
 }
 
-function clasesDelDia(clases: Clase[], dayOfWeek: number): Clase[] {
-  return clases.filter((c) => DIA_NUMERO[c.diaSemana] === dayOfWeek);
+function clasesDelDia(clases: Clase[], dayOfWeek: number, año: number, mes: number, dia: number): Clase[] {
+  const fecha = new Date(año, mes - 1, dia);
+  return clases.filter((c) => {
+    if (DIA_NUMERO[c.diaSemana] !== dayOfWeek) return false;
+    if (c.fechaFin) return new Date(c.fechaFin) >= fecha;
+    return true;
+  });
 }
 
 function dayOfWeekForCell(colIndex: number): number {
@@ -99,16 +104,18 @@ export default function ClasesPage() {
   const [formClase, setFormClase] = useState({
     nombre: '', nivelMin: 1.0, nivelMax: 2.0,
     profesorId: '', pistaId: '',
-    diaSemana: 'LUNES' as DiaSemana,
+    diasSemana: ['LUNES'] as DiaSemana[],
     horaInicio: '09:00', horaFin: '10:00',
     plazasTotal: 4,
+    recurrencia: 'permanente' as 'permanente' | 'este_mes' | 'hasta_fecha',
+    fechaFin: '',
   });
   const [guardandoClase, setGuardandoClase] = useState(false);
   const [errorClase, setErrorClase] = useState('');
 
   const abrirModalNueva = async () => {
     setErrorClase('');
-    setFormClase({ nombre: '', nivelMin: 1.0, nivelMax: 2.0, profesorId: '', pistaId: '', diaSemana: 'LUNES', horaInicio: '09:00', horaFin: '10:00', plazasTotal: 4 });
+    setFormClase({ nombre: '', nivelMin: 1.0, nivelMax: 2.0, profesorId: '', pistaId: '', diasSemana: ['LUNES'], horaInicio: '09:00', horaFin: '10:00', plazasTotal: 4, recurrencia: 'permanente', fechaFin: '' });
     const [profs, pts] = await Promise.all([profesoresApi.list(), pistasApi.list()]);
     setProfesores(profs.filter((p) => p.activo));
     setPistas(pts.filter((p) => p.activa));
@@ -122,13 +129,32 @@ export default function ClasesPage() {
     if (!formClase.profesorId) { setErrorClase('Selecciona un profesor'); return; }
     if (!formClase.pistaId) { setErrorClase('Selecciona una pista'); return; }
     if (formClase.nivelMin >= formClase.nivelMax) { setErrorClase('El nivel mínimo debe ser menor que el máximo'); return; }
+    if (formClase.diasSemana.length === 0) { setErrorClase('Selecciona al menos un día'); return; }
+    if (formClase.recurrencia === 'hasta_fecha' && !formClase.fechaFin) { setErrorClase('Selecciona una fecha de fin'); return; }
     setGuardandoClase(true); setErrorClase('');
     try {
-      await clasesApi.create(formClase);
+      const fechaFinValue =
+        formClase.recurrencia === 'este_mes'
+          ? new Date(año, mes, 0).toISOString()
+          : formClase.recurrencia === 'hasta_fecha' && formClase.fechaFin
+          ? new Date(formClase.fechaFin).toISOString()
+          : null;
+      await Promise.all(
+        formClase.diasSemana.map((diaSemana) =>
+          clasesApi.create({
+            nombre: formClase.nombre, nivelMin: formClase.nivelMin, nivelMax: formClase.nivelMax,
+            profesorId: formClase.profesorId, pistaId: formClase.pistaId,
+            diaSemana, horaInicio: formClase.horaInicio, horaFin: formClase.horaFin,
+            plazasTotal: formClase.plazasTotal,
+            ...(fechaFinValue ? { fechaFin: fechaFinValue } : {}),
+          } as any),
+        ),
+      );
       const updated = await clasesApi.list({ activa: 'true' });
       setClases(updated);
       setModalNueva(false);
-      setToast('Clase creada correctamente ✓');
+      const n = formClase.diasSemana.length;
+      setToast(`${n === 1 ? 'Clase creada' : `${n} clases creadas`} correctamente ✓`);
       setTimeout(() => setToast(''), 3000);
     } catch (e: any) {
       setErrorClase(e.message ?? 'Error al crear la clase');
@@ -360,7 +386,7 @@ export default function ClasesPage() {
             <div key={wi} className="grid grid-cols-7 border-b border-slate-50 last:border-b-0">
               {week.map((dia, ci) => {
                 const dow = dayOfWeekForCell(ci);
-                const clasesHoy = dia ? clasesDelDia(clases, dow) : [];
+                const clasesHoy = dia ? clasesDelDia(clases, dow, año, mes, dia) : [];
                 const hoyFlag = dia ? esHoy(dia) : false;
                 const past = dia ? isPast(dia) : false;
 
@@ -923,24 +949,79 @@ export default function ClasesPage() {
                 </select>
               </div>
 
-              {/* Día de la semana */}
+              {/* Días de la semana — multi selección */}
               <div>
-                <label className="label">Día de la semana</label>
+                <label className="label">Días de la semana</label>
                 <div className="flex gap-1.5 flex-wrap">
-                  {DIAS_SEMANA.map((d) => (
-                    <button
-                      key={d.value}
-                      type="button"
-                      onClick={() => setFormClase((f) => ({ ...f, diaSemana: d.value }))}
-                      className="w-11 h-11 rounded-xl text-sm font-bold border-2 transition-all"
-                      style={formClase.diaSemana === d.value
-                        ? { background: '#1e83ec', color: '#fff', borderColor: '#1e83ec' }
-                        : { background: '#f8fafc', color: '#64748b', borderColor: '#e2e8f0' }}
+                  {DIAS_SEMANA.map((d) => {
+                    const checked = formClase.diasSemana.includes(d.value);
+                    return (
+                      <button
+                        key={d.value}
+                        type="button"
+                        onClick={() => setFormClase((f) => ({
+                          ...f,
+                          diasSemana: checked
+                            ? f.diasSemana.filter((x) => x !== d.value)
+                            : [...f.diasSemana, d.value],
+                        }))}
+                        className="w-11 h-11 rounded-xl text-sm font-bold border-2 transition-all"
+                        style={checked
+                          ? { background: '#1e83ec', color: '#fff', borderColor: '#1e83ec' }
+                          : { background: '#f8fafc', color: '#64748b', borderColor: '#e2e8f0' }}
+                      >
+                        {d.label}
+                      </button>
+                    );
+                  })}
+                </div>
+                {formClase.diasSemana.length > 1 && (
+                  <p className="text-xs text-slate-400 mt-1.5">
+                    Se crearán {formClase.diasSemana.length} clases independientes con el mismo horario.
+                  </p>
+                )}
+              </div>
+
+              {/* Recurrencia */}
+              <div>
+                <label className="label">Recurrencia</label>
+                <div className="space-y-2">
+                  {[
+                    { value: 'permanente', label: 'Permanente', desc: 'Se repite todas las semanas indefinidamente' },
+                    { value: 'este_mes', label: 'Solo este mes', desc: `Hasta el ${new Date(año, mes, 0).getDate()} de ${mesLabel}` },
+                    { value: 'hasta_fecha', label: 'Hasta una fecha', desc: '' },
+                  ].map((opt) => (
+                    <label
+                      key={opt.value}
+                      className="flex items-start gap-3 p-3 rounded-xl border-2 cursor-pointer transition-all"
+                      style={formClase.recurrencia === opt.value
+                        ? { borderColor: '#1e83ec', background: '#eff6ff' }
+                        : { borderColor: '#e2e8f0', background: '#f8fafc' }}
                     >
-                      {d.label}
-                    </button>
+                      <input
+                        type="radio"
+                        name="recurrencia"
+                        value={opt.value}
+                        checked={formClase.recurrencia === opt.value}
+                        onChange={() => setFormClase((f) => ({ ...f, recurrencia: opt.value as any }))}
+                        className="mt-0.5 accent-[#1e83ec]"
+                      />
+                      <div>
+                        <p className="text-sm font-semibold text-slate-700">{opt.label}</p>
+                        {opt.desc && <p className="text-xs text-slate-400">{opt.desc}</p>}
+                      </div>
+                    </label>
                   ))}
                 </div>
+                {formClase.recurrencia === 'hasta_fecha' && (
+                  <input
+                    type="date"
+                    className="input mt-2"
+                    value={formClase.fechaFin}
+                    min={new Date().toISOString().split('T')[0]}
+                    onChange={(e) => setFormClase((f) => ({ ...f, fechaFin: e.target.value }))}
+                  />
+                )}
               </div>
 
               {/* Horario */}

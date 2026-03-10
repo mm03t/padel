@@ -91,6 +91,7 @@ model Clase {
   horaFin     String    @map("hora_fin")    // "10:00"
   plazasTotal Int       @default(4) @map("plazas_total")
   activa      Boolean   @default(true)
+  fechaFin    DateTime? @map("fecha_fin")
   createdAt   DateTime  @default(now()) @map("created_at")
 
   profesor      Profesor      @relation(fields: [profesorId], references: [id])

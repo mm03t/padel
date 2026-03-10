@@ -55,6 +55,7 @@ export interface Clase {
   horaFin: string;
   plazasTotal: number;
   activa: boolean;
+  fechaFin?: string;
   profesor: Profesor;
   pista: Pista;
   inscripciones: AlumnoClase[];

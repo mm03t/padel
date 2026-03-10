@@ -64,7 +64,7 @@ router.get('/:id', async (req: Request, res: Response) => {
 // POST /api/clases
 router.post('/', async (req: Request, res: Response) => {
   try {
-    const { nombre, nivelMin, nivelMax, profesorId, pistaId, diaSemana, horaInicio, horaFin, plazasTotal } = req.body;
+    const { nombre, nivelMin, nivelMax, profesorId, pistaId, diaSemana, horaInicio, horaFin, plazasTotal, fechaFin } = req.body;
 
     const clase = await prisma.clase.create({
       data: {
@@ -77,6 +77,7 @@ router.post('/', async (req: Request, res: Response) => {
         horaInicio,
         horaFin,
         plazasTotal: parseInt(plazasTotal) || 4,
+        ...(fechaFin ? { fechaFin: new Date(fechaFin) } : {}),
       },
       include: { profesor: true, pista: true },
     });
