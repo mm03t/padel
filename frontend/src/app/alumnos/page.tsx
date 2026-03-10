@@ -436,7 +436,7 @@ export default function AlumnosPage() {
                                   <span
                                     key={i}
                                     className={`inline-block h-2 w-2 rounded-full ${
-                                      i < c.inscritos ? 'bg-slate-300' : 'bg-emerald-400'
+                                      i < c.inscritos ? 'bg-red-400' : 'bg-emerald-400'
                                     }`}
                                   />
                                 ))}
