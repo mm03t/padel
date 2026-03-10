@@ -253,4 +253,39 @@ router.delete('/:id', async (req: Request, res: Response) => {
   }
 });
 
+// DELETE /api/alumnos/:id/purge  (hard delete — borra el alumno y todos sus datos)
+router.delete('/:id/purge', async (req: Request, res: Response) => {
+  try {
+    const id = req.params.id;
+    // Borrar en orden para respetar FK
+    await prisma.notificacion.deleteMany({ where: { alumnoId: id } });
+    await prisma.listaEspera.deleteMany({ where: { alumnoId: id } });
+    await prisma.recuperacion.deleteMany({ where: { alumnoId: id } });
+    await prisma.asistencia.deleteMany({ where: { alumnoId: id } });
+    await prisma.alumnoClase.deleteMany({ where: { alumnoId: id } });
+    await prisma.pago.deleteMany({ where: { alumnoId: id } });
+    await prisma.solicitudEspera.deleteMany({ where: { alumnoId: id } });
+    await prisma.alumno.delete({ where: { id } });
+    res.json({ ok: true });
+  } catch (error: any) {
+    res.status(500).json({ error: 'Error al borrar el alumno' });
+  }
+});
+// DELETE /api/alumnos/:id/purge  (hard delete — borra el alumno y todos sus datos)
+router.delete('/:id/purge', async (req: Request, res: Response) => {
+  try {
+    const id = req.params.id;
+    await prisma.notificacion.deleteMany({ where: { alumnoId: id } });
+    await prisma.listaEspera.deleteMany({ where: { alumnoId: id } });
+    await prisma.recuperacion.deleteMany({ where: { alumnoId: id } });
+    await prisma.asistencia.deleteMany({ where: { alumnoId: id } });
+    await prisma.alumnoClase.deleteMany({ where: { alumnoId: id } });
+    await prisma.pago.deleteMany({ where: { alumnoId: id } });
+    await prisma.solicitudEspera.deleteMany({ where: { alumnoId: id } });
+    await prisma.alumno.delete({ where: { id } });
+    res.json({ ok: true });
+  } catch (error: any) {
+    res.status(500).json({ error: 'Error al borrar el alumno' });
+  }
+});
 export default router;

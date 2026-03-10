@@ -41,6 +41,7 @@ export const alumnos = {
   update: (id: string, data: Partial<Alumno>) =>
     req<Alumno>(`/alumnos/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   remove: (id: string) => req<BajaResult>(`/alumnos/${id}`, { method: 'DELETE' }),
+  purge: (id: string) => req<{ ok: boolean }>(`/alumnos/${id}/purge`, { method: 'DELETE' }),
 };
 
 // ─────────────────────────────────────────

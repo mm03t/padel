@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { UserPlus, Search, Pencil, Power, CheckCircle, Clock, Zap, ChevronUp, ChevronDown } from 'lucide-react';
+import { UserPlus, Search, Pencil, Power, CheckCircle, Clock, Zap, ChevronUp, ChevronDown, Trash2, Loader2 } from 'lucide-react';
 import { alumnos as api } from '@/lib/api';
 import type { Alumno, Disponibilidad, ClaseDisponible } from '@/types';
 
@@ -37,6 +37,8 @@ export default function AlumnosPage() {
   });
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState('');
+  const [confirmarBorrar, setConfirmarBorrar] = useState<Alumno | null>(null);
+  const [borrando, setBorrando] = useState(false);
   const [clasesDisponibles, setClasesDisponibles] = useState<ClaseDisponible[]>([]);
   const [claseSeleccionada, setClaseSeleccionada] = useState<string>('auto');
   const [loadingClases, setLoadingClases] = useState(false);
@@ -161,6 +163,19 @@ export default function AlumnosPage() {
       await api.update(a.id, { activo: true });
       cargar();
     }
+  };
+
+  const borrarAlumno = async (a: Alumno) => {
+    setBorrando(true);
+    try {
+      await api.purge(a.id);
+      cargar();
+      setConfirmarBorrar(null);
+      showToast(`${a.nombre} ${a.apellidos} eliminado permanentemente`, true);
+    } catch (e: any) {
+      showToast(e.message ?? 'Error al borrar', false);
+    }
+    setBorrando(false);
   };
 
   const campo = (key: keyof Alumno) => (e: any) =>
@@ -309,6 +324,13 @@ export default function AlumnosPage() {
                           title={a.activo ? 'Desactivar' : 'Activar'}
                         >
                           <Power size={14} />
+                        </button>
+                        <button
+                          onClick={() => setConfirmarBorrar(a)}
+                          className="btn btn-ghost p-2 text-slate-300 hover:text-rose-500"
+                          title="Eliminar permanentemente"
+                        >
+                          <Trash2 size={14} />
                         </button>
                       </div>
                     </td>
@@ -473,6 +495,43 @@ export default function AlumnosPage() {
               <button onClick={cerrar} className="btn btn-secondary">Cancelar</button>
               <button onClick={guardar} disabled={saving} className="btn btn-primary">
                 {saving ? 'Guardando…' : 'Guardar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal confirmación borrar */}
+      {confirmarBorrar && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-full bg-rose-100 flex items-center justify-center shrink-0">
+                <Trash2 size={18} className="text-rose-600" />
+              </div>
+              <div>
+                <h3 className="font-black text-slate-800">¿Eliminar alumno?</h3>
+                <p className="text-xs text-slate-400 mt-0.5">Esta acción no se puede deshacer</p>
+              </div>
+            </div>
+            <p className="text-sm text-slate-600 mb-5">
+              Se eliminarán permanentemente todos los datos de{' '}
+              <strong>{confirmarBorrar.nombre} {confirmarBorrar.apellidos}</strong>: historial, asistencias, recuperaciones y pagos.
+            </p>
+            <div className="flex gap-2">
+              <button
+                onClick={() => borrarAlumno(confirmarBorrar)}
+                disabled={borrando}
+                className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-bold text-white bg-rose-500 hover:bg-rose-600 disabled:opacity-50"
+              >
+                {borrando ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                Eliminar
+              </button>
+              <button
+                onClick={() => setConfirmarBorrar(null)}
+                className="flex-1 py-2.5 rounded-xl text-sm font-semibold border border-slate-200 text-slate-600 hover:bg-slate-50"
+              >
+                Cancelar
               </button>
             </div>
           </div>
