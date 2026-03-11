@@ -18,6 +18,7 @@ export interface Alumno {
   nivel: number;
   disponibilidad: Disponibilidad;
   activo: boolean;
+  pagoAlDia: boolean;
   notas?: string;
   tarifaMensual?: number;
   createdAt: string;

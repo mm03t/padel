@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { UserPlus, Search, Pencil, Power, CheckCircle, Clock, Zap, ChevronUp, ChevronDown, Trash2, Loader2 } from 'lucide-react';
+import { UserPlus, Search, Pencil, Power, CheckCircle, Clock, Zap, ChevronUp, ChevronDown, Trash2, Loader2, EuroIcon } from 'lucide-react';
 import { alumnos as api } from '@/lib/api';
 import type { Alumno, Disponibilidad, ClaseDisponible } from '@/types';
 
@@ -30,7 +30,7 @@ export default function AlumnosPage() {
   const [error, setError] = useState('');
   const [search, setSearch] = useState('');
   const [filtroActivo, setFiltroActivo] = useState(true);
-  const [sortCol, setSortCol] = useState<'alumno' | 'nivel' | 'disponibilidad' | 'clase' | 'recuperaciones'>('alumno');
+  const [sortCol, setSortCol] = useState<'alumno' | 'nivel' | 'disponibilidad' | 'clase' | 'recuperaciones' | 'pago'>('alumno');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
   const [modal, setModal] = useState<{ open: boolean; data: Partial<Alumno>; editId?: string }>({
     open: false, data: EMPTY,
@@ -77,6 +77,7 @@ export default function AlumnosPage() {
       vb = (b.inscripciones?.filter((i) => i.activo).map((i) => i.clase.nombre).join('') ?? '').toLowerCase();
     }
     else if (sortCol === 'recuperaciones') { va = a._count?.recuperaciones ?? 0; vb = b._count?.recuperaciones ?? 0; }
+    else if (sortCol === 'pago') { va = a.pagoAlDia ? 0 : 1; vb = b.pagoAlDia ? 0 : 1; }
     if (va < vb) return sortDir === 'asc' ? -1 : 1;
     if (va > vb) return sortDir === 'asc' ? 1 : -1;
     return 0;
@@ -178,6 +179,23 @@ export default function AlumnosPage() {
     setBorrando(false);
   };
 
+  const togglePago = async (a: Alumno) => {
+    const nuevo = !a.pagoAlDia;
+    // Optimistic update
+    setLista((prev) => prev.map((x) => x.id === a.id ? { ...x, pagoAlDia: nuevo } : x));
+    try {
+      await api.update(a.id, { pagoAlDia: nuevo } as any);
+      showToast(
+        nuevo ? `${a.nombre} marcado al corriente de pago` : `${a.nombre} marcado con pago pendiente`,
+        nuevo,
+      );
+    } catch {
+      // revert
+      setLista((prev) => prev.map((x) => x.id === a.id ? { ...x, pagoAlDia: a.pagoAlDia } : x));
+      showToast('Error al actualizar pago', false);
+    }
+  };
+
   const campo = (key: keyof Alumno) => (e: any) =>
     setModal((m) => ({ ...m, data: { ...m.data, [key]: e.target.value } }));
 
@@ -266,6 +284,7 @@ export default function AlumnosPage() {
                   ['disponibilidad', 'Disponibilidad','px-3'],
                   ['clase',          'Clase',         'px-3'],
                   ['recuperaciones', 'Recup. pend.',  'px-3'],
+                  ['pago',           'Pago',          'px-3'],
                 ] as const).map(([col, label, pad]) => (
                   <th
                     key={col}
@@ -312,6 +331,20 @@ export default function AlumnosPage() {
                       {a._count && a._count.recuperaciones > 0
                         ? <span className="badge badge-yellow">{a._count.recuperaciones}</span>
                         : <span className="text-slate-300 text-xs">—</span>}
+                    </td>
+                    <td className="px-3 py-3.5">
+                      <button
+                        onClick={() => togglePago(a)}
+                        title={a.pagoAlDia ? 'Al corriente — clic para marcar pendiente' : 'Pago pendiente — clic para marcar al corriente'}
+                        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold border transition-colors cursor-pointer ${
+                          a.pagoAlDia
+                            ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100'
+                            : 'bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100'
+                        }`}
+                      >
+                        <EuroIcon size={10} />
+                        {a.pagoAlDia ? 'Al día' : 'Pendiente'}
+                      </button>
                     </td>
                     <td className="px-3 py-3.5">
                       <div className="flex gap-1 justify-end">
