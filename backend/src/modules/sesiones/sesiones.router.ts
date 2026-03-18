@@ -170,6 +170,35 @@ router.post('/:id/asistencia', async (req: Request, res: Response) => {
           },
           data: { estado: 'CANCELADA' },
         });
+
+        // Auto-pendiente: primera asistencia del mes → marcar pago pendiente
+        const now = new Date();
+        const mesActual = now.getMonth();
+        const añoActual = now.getFullYear();
+        const inicioMes = new Date(añoActual, mesActual, 1);
+        const finMes = new Date(añoActual, mesActual + 1, 0, 23, 59, 59);
+
+        const asistenciasPrevias = await prisma.asistencia.count({
+          where: {
+            alumnoId: item.alumnoId,
+            estado: 'PRESENTE',
+            sesion: { fecha: { gte: inicioMes, lte: finMes } },
+            id: { not: asistencia.id },
+          },
+        });
+
+        // Si es la primera asistencia PRESENTE del mes → pago pendiente
+        if (asistenciasPrevias === 0) {
+          const alumno = await prisma.alumno.findUnique({ where: { id: item.alumnoId }, select: { pagoAlDia: true, fechaPago: true } });
+          // Solo marcar pendiente si el último pago no fue este mismo mes
+          const yaPagesteEMes = alumno?.fechaPago && new Date(alumno.fechaPago) >= inicioMes;
+          if (alumno && !yaPagesteEMes) {
+            await prisma.alumno.update({
+              where: { id: item.alumnoId },
+              data: { pagoAlDia: false },
+            });
+          }
+        }
       }
 
       resultados.push(asistencia);

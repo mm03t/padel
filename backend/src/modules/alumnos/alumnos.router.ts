@@ -183,7 +183,7 @@ router.post('/', async (req: Request, res: Response) => {
 // PUT /api/alumnos/:id
 router.put('/:id', async (req: Request, res: Response) => {
   try {
-    const { nombre, apellidos, email, telefono, nivel, disponibilidad, activo, notas } = req.body;
+    const { nombre, apellidos, email, telefono, nivel, disponibilidad, activo, notas, pagoAlDia, metodoPago, fechaPago } = req.body;
 
     const alumno = await prisma.alumno.update({
       where: { id: req.params.id },
@@ -196,6 +196,9 @@ router.put('/:id', async (req: Request, res: Response) => {
         ...(disponibilidad !== undefined ? { disponibilidad } : {}),
         ...(activo !== undefined ? { activo } : {}),
         ...(notas !== undefined ? { notas } : {}),
+        ...(pagoAlDia !== undefined ? { pagoAlDia } : {}),
+        ...(metodoPago !== undefined ? { metodoPago } : {}),
+        ...(fechaPago !== undefined ? { fechaPago: fechaPago ? new Date(fechaPago) : null } : {}),
       },
     });
 

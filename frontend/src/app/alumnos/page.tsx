@@ -88,7 +88,7 @@ export default function AlumnosPage() {
   });
 
   // Separar alumnos con clase de los que están en espera
-  const listaConClase = listaSorted.filter((a) => !a.activo || a.inscripciones?.some((i) => i.activo));
+  const listaConClase = listaSorted;
   const sinClaseCount = filtroActivo ? listaSorted.filter((a) => a.activo && !a.inscripciones?.some((i) => i.activo)).length : 0;
 
   const abrirNuevo = () => {
@@ -326,7 +326,11 @@ export default function AlumnosPage() {
                 const clasesActivas = a.inscripciones?.filter((i) => i.activo) ?? [];
                 const sinClase = clasesActivas.length === 0 && a.activo;
                 return (
-                  <tr key={a.id} className="hover:bg-slate-50/60 transition-colors">
+                  <tr key={a.id} className={`transition-colors ${
+                    !a.pagoAlDia
+                      ? 'bg-rose-50/60 hover:bg-rose-50'
+                      : 'hover:bg-slate-50/60'
+                  }`}>
                     <td className="px-5 py-3.5">
                       <p className="font-semibold text-slate-800">{a.nombre} {a.apellidos}</p>
                       <p className="text-xs text-slate-400">{a.email} · {a.telefono}</p>
