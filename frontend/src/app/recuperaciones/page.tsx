@@ -6,6 +6,7 @@ import { es } from 'date-fns/locale';
 import { RotateCcw, X, Calendar, CheckCircle } from 'lucide-react';
 import { recuperaciones as api, clases as apiClases } from '@/lib/api';
 import type { Recuperacion, Sesion, EstadoRecuperacion, Clase } from '@/types';
+import UpgradeGate from '@/components/UpgradeGate';
 
 const ESTADO_BADGE: Record<EstadoRecuperacion, string> = {
   PENDIENTE: 'badge-yellow',
@@ -34,6 +35,14 @@ function diasRestantes(fecha: string) {
 }
 
 export default function RecuperacionesPage() {
+  return (
+    <UpgradeGate feature="recuperaciones">
+      <RecuperacionesContent />
+    </UpgradeGate>
+  );
+}
+
+function RecuperacionesContent() {
   const [tab, setTab] = useState<'recuperaciones' | 'disponibles'>('recuperaciones');
 
   // ── tab recuperaciones ─────────────────────────────────────────────────────

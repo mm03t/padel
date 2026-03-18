@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import {
   LayoutDashboard,
   Users,
@@ -9,7 +9,11 @@ import {
   RotateCcw,
   ListOrdered,
   Dumbbell,
+  ArrowLeftRight,
+  Lock,
 } from 'lucide-react';
+import { usePlan } from '@/components/PlanContext';
+import { NAV_ACCESS } from '@/lib/plans';
 
 const nav = [
   { href: '/',               label: 'Dashboard',      icon: LayoutDashboard },
@@ -21,6 +25,15 @@ const nav = [
 
 export default function Sidebar() {
   const pathname = usePathname();
+  const router = useRouter();
+  const { plan, planDef, clearPlan } = usePlan();
+
+  const allowed = plan ? NAV_ACCESS[plan] : [];
+
+  const cambiarPlan = () => {
+    clearPlan();
+    router.push('/planes');
+  };
 
   return (
     <aside className="w-60 bg-slate-900 text-white flex flex-col shrink-0 h-full">
@@ -37,31 +50,61 @@ export default function Sidebar() {
         </div>
       </div>
 
+      {/* Plan badge */}
+      {planDef && (
+        <div className="px-4 pt-4 pb-2">
+          <div
+            className="flex items-center justify-between px-3 py-2 rounded-lg text-xs font-bold"
+            style={{ background: planDef.color + '18', color: planDef.color, border: `1px solid ${planDef.color}30` }}
+          >
+            <span>Plan {planDef.badge}</span>
+            <span>{planDef.price}€/mes</span>
+          </div>
+        </div>
+      )}
+
       {/* Navegación */}
       <nav className="flex-1 p-3 space-y-0.5">
         {nav.map(({ href, label, icon: Icon }) => {
           const active = href === '/' ? pathname === '/' : pathname.startsWith(href);
+          const locked = !allowed.includes(href);
           return (
             <Link
               key={href}
-              href={href}
+              href={locked ? '#' : href}
+              onClick={locked ? (e) => e.preventDefault() : undefined}
               className={`flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-                active
-                  ? 'text-white'
-                  : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                locked
+                  ? 'text-slate-600 cursor-not-allowed opacity-50'
+                  : active
+                    ? 'text-white'
+                    : 'text-slate-400 hover:bg-slate-800 hover:text-white'
               }`}
-              style={active ? { background: '#1e83ec' } : {}}
+              style={active && !locked ? { background: '#1e83ec' } : {}}
+              title={locked ? `Disponible desde el plan Club` : undefined}
             >
               <Icon size={17} strokeWidth={2} />
               {label}
+              {locked && <Lock size={12} className="ml-auto text-slate-600" />}
             </Link>
           );
         })}
       </nav>
 
+      {/* Cambiar plan */}
+      <div className="px-3 pb-2">
+        <button
+          onClick={cambiarPlan}
+          className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold text-slate-400 hover:text-white hover:bg-slate-800 transition-colors border border-slate-700/50"
+        >
+          <ArrowLeftRight size={13} />
+          Cambiar plan
+        </button>
+      </div>
+
       {/* Footer */}
       <div className="px-5 py-4 border-t border-slate-700/60">
-        <p className="text-xs text-slate-500">MVP v1.0 · 2026</p>
+        <p className="text-xs text-slate-500">SaaS Demo · 2026</p>
       </div>
     </aside>
   );
