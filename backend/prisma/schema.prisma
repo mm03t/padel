@@ -24,6 +24,8 @@ model Alumno {
   disponibilidad Disponibilidad @default(FLEXIBLE)
   activo         Boolean        @default(true)
   pagoAlDia      Boolean        @default(true) @map("pago_al_dia")
+  metodoPago     String?        @map("metodo_pago")
+  fechaPago      DateTime?      @map("fecha_pago")
   notas          String?
   tarifaMensual  Float?         @default(50) @map("tarifa_mensual")
   createdAt      DateTime       @default(now()) @map("created_at")

@@ -19,6 +19,8 @@ export interface Alumno {
   disponibilidad: Disponibilidad;
   activo: boolean;
   pagoAlDia: boolean;
+  metodoPago?: string | null;
+  fechaPago?: string | null;
   notas?: string;
   tarifaMensual?: number;
   createdAt: string;

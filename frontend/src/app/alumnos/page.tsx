@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { UserPlus, Search, Pencil, Power, CheckCircle, Clock, Zap, ChevronUp, ChevronDown, Trash2, Loader2, EuroIcon } from 'lucide-react';
+import { UserPlus, Search, Pencil, Power, CheckCircle, Clock, Zap, ChevronUp, ChevronDown, Trash2, Loader2, EuroIcon, Banknote, CreditCard } from 'lucide-react';
 import { alumnos as api } from '@/lib/api';
 import type { Alumno, Disponibilidad, ClaseDisponible } from '@/types';
 
@@ -43,6 +43,10 @@ export default function AlumnosPage() {
   const [claseSeleccionada, setClaseSeleccionada] = useState<string>('auto');
   const [loadingClases, setLoadingClases] = useState(false);
   const [toast, setToast] = useState<{ msg: string; ok: boolean; detail?: string } | null>(null);
+  const [modalPago, setModalPago] = useState<{ alumno: Alumno } | null>(null);
+  const [pagoFecha, setPagoFecha] = useState('');
+  const [pagoMetodo, setPagoMetodo] = useState<'efectivo' | 'tarjeta'>('efectivo');
+  const [guardandoPago, setGuardandoPago] = useState(false);
 
   const showToast = (msg: string, ok = true, detail?: string) => {
     setToast({ msg, ok, detail });
@@ -179,21 +183,36 @@ export default function AlumnosPage() {
     setBorrando(false);
   };
 
-  const togglePago = async (a: Alumno) => {
+  const abrirModalPago = (a: Alumno) => {
+    setPagoFecha(new Date().toISOString().split('T')[0]);
+    setPagoMetodo('efectivo');
+    setModalPago({ alumno: a });
+  };
+
+  const confirmarPago = async () => {
+    if (!modalPago) return;
+    const a = modalPago.alumno;
     const nuevo = !a.pagoAlDia;
-    // Optimistic update
-    setLista((prev) => prev.map((x) => x.id === a.id ? { ...x, pagoAlDia: nuevo } : x));
+    setGuardandoPago(true);
     try {
-      await api.update(a.id, { pagoAlDia: nuevo } as any);
+      await api.update(a.id, {
+        pagoAlDia: nuevo,
+        ...(nuevo
+          ? { metodoPago: pagoMetodo, fechaPago: new Date(pagoFecha).toISOString() }
+          : { metodoPago: null, fechaPago: null }),
+      } as any);
+      cargar();
+      setModalPago(null);
       showToast(
-        nuevo ? `${a.nombre} marcado al corriente de pago` : `${a.nombre} marcado con pago pendiente`,
+        nuevo
+          ? `Pago registrado · ${pagoMetodo === 'efectivo' ? 'Efectivo' : 'Tarjeta'}`
+          : `${a.nombre} marcado con pago pendiente`,
         nuevo,
       );
     } catch {
-      // revert
-      setLista((prev) => prev.map((x) => x.id === a.id ? { ...x, pagoAlDia: a.pagoAlDia } : x));
       showToast('Error al actualizar pago', false);
     }
+    setGuardandoPago(false);
   };
 
   const campo = (key: keyof Alumno) => (e: any) =>
@@ -334,8 +353,8 @@ export default function AlumnosPage() {
                     </td>
                     <td className="px-3 py-3.5">
                       <button
-                        onClick={() => togglePago(a)}
-                        title={a.pagoAlDia ? 'Al corriente — clic para marcar pendiente' : 'Pago pendiente — clic para marcar al corriente'}
+                        onClick={() => abrirModalPago(a)}
+                        title={a.pagoAlDia ? 'Al corriente — clic para cambiar' : 'Pago pendiente — clic para registrar pago'}
                         className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold border transition-colors cursor-pointer ${
                           a.pagoAlDia
                             ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100'
@@ -510,8 +529,8 @@ export default function AlumnosPage() {
                     const c = clasesDisponibles.find((x) => x.id === claseSeleccionada);
                     if (!c) return null;
                     return (
-                      <p className="text-xs mt-3 px-3 py-2 rounded-lg font-medium bg-emerald-50 text-emerald-700">
-                        ✅ Plaza confirmada · Profesor: {c.profesor}
+                      <p className="text-xs mt-3 px-3 py-2 rounded-lg font-medium bg-emerald-50 text-emerald-700 flex items-center gap-1.5">
+                        <CheckCircle size={12} /> Plaza confirmada · Profesor: {c.profesor}
                       </p>
                     );
                   })()}
@@ -530,6 +549,108 @@ export default function AlumnosPage() {
                 {saving ? 'Guardando…' : 'Guardar'}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal pago */}
+      {modalPago && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6">
+            {modalPago.alumno.pagoAlDia ? (
+              <>
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center shrink-0">
+                    <EuroIcon size={18} className="text-amber-600" />
+                  </div>
+                  <div>
+                    <h3 className="font-black text-slate-800">¿Marcar como pendiente?</h3>
+                    <p className="text-xs text-slate-400 mt-0.5">{modalPago.alumno.nombre} {modalPago.alumno.apellidos}</p>
+                  </div>
+                </div>
+                <p className="text-sm text-slate-600 mb-5">Se eliminará el registro del último pago.</p>
+                <div className="flex gap-2">
+                  <button
+                    onClick={confirmarPago}
+                    disabled={guardandoPago}
+                    className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-bold text-white bg-amber-500 hover:bg-amber-600 disabled:opacity-50"
+                  >
+                    {guardandoPago ? <Loader2 size={14} className="animate-spin" /> : <EuroIcon size={14} />}
+                    Marcar pendiente
+                  </button>
+                  <button
+                    onClick={() => setModalPago(null)}
+                    className="flex-1 py-2.5 rounded-xl text-sm font-semibold border border-slate-200 text-slate-600 hover:bg-slate-50"
+                  >
+                    Cancelar
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center shrink-0">
+                    <EuroIcon size={18} className="text-emerald-600" />
+                  </div>
+                  <div>
+                    <h3 className="font-black text-slate-800">Registrar pago</h3>
+                    <p className="text-xs text-slate-400 mt-0.5">{modalPago.alumno.nombre} {modalPago.alumno.apellidos}</p>
+                  </div>
+                </div>
+                <div className="space-y-4 mb-5">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-500 mb-1.5">Fecha de pago</label>
+                    <input
+                      type="date"
+                      value={pagoFecha}
+                      onChange={(e) => setPagoFecha(e.target.value)}
+                      className="w-full px-3 py-2 text-sm rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-500 mb-1.5">Método de pago</label>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => setPagoMetodo('efectivo')}
+                        className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg border text-sm font-semibold transition-colors ${
+                          pagoMetodo === 'efectivo'
+                            ? 'bg-emerald-50 border-emerald-400 text-emerald-700'
+                            : 'border-slate-200 text-slate-500 hover:bg-slate-50'
+                        }`}
+                      >
+                        <Banknote size={15} /> Efectivo
+                      </button>
+                      <button
+                        onClick={() => setPagoMetodo('tarjeta')}
+                        className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg border text-sm font-semibold transition-colors ${
+                          pagoMetodo === 'tarjeta'
+                            ? 'bg-blue-50 border-blue-400 text-blue-700'
+                            : 'border-slate-200 text-slate-500 hover:bg-slate-50'
+                        }`}
+                      >
+                        <CreditCard size={15} /> Tarjeta
+                      </button>
+                    </div>
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={confirmarPago}
+                    disabled={guardandoPago}
+                    className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-bold text-white bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50"
+                  >
+                    {guardandoPago ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle size={14} />}
+                    Registrar pago
+                  </button>
+                  <button
+                    onClick={() => setModalPago(null)}
+                    className="flex-1 py-2.5 rounded-xl text-sm font-semibold border border-slate-200 text-slate-600 hover:bg-slate-50"
+                  >
+                    Cancelar
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}

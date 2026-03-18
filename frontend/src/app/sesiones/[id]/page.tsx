@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { ArrowLeft, CheckCircle2, XCircle, RefreshCw, Save } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, XCircle, RefreshCw, Save, AlertTriangle, CheckCircle } from 'lucide-react';
 import { sesiones as api } from '@/lib/api';
 import type { Sesion, EstadoAsistencia } from '@/types';
 
@@ -115,7 +115,7 @@ export default function SesionPage() {
               yaCompletada ? 'badge-green' :
               sesion.estado === 'EN_CURSO' ? 'badge-yellow' : 'badge-gray'
             }`}>
-              {yaCompletada ? '✓ Completada' : sesion.estado}
+              {yaCompletada ? <span className="flex items-center gap-1"><CheckCircle size={11} /> Completada</span> : sesion.estado}
             </span>
           </div>
         </div>
@@ -193,11 +193,11 @@ export default function SesionPage() {
       <div className="flex items-center justify-between">
         <div className="text-sm text-slate-500">
           {faltas > 0 ? (
-            <span className="text-amber-600 font-semibold">
-              ⚠️ {faltas} falta(s) → se generarán {faltas} recuperación(es)
+            <span className="text-amber-600 font-semibold flex items-center gap-1.5">
+              <AlertTriangle size={14} /> {faltas} falta(s) — se generarán {faltas} recuperación(es)
             </span>
           ) : (
-            <span className="text-emerald-600 font-medium">✓ Sin faltas</span>
+            <span className="text-emerald-600 font-medium flex items-center gap-1.5"><CheckCircle size={14} /> Sin faltas</span>
           )}
         </div>
         <button
@@ -208,7 +208,7 @@ export default function SesionPage() {
           {saving ? (
             'Guardando…'
           ) : yaCompletada ? (
-            '✓ Asistencia guardada'
+            <span className="flex items-center gap-1"><CheckCircle size={14} /> Asistencia guardada</span>
           ) : (
             <><Save size={15} /> Guardar asistencia</>
           )}

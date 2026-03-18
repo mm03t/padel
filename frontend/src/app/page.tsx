@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { Users, CalendarDays, RotateCcw, Bell, AlertTriangle, ArrowRight } from 'lucide-react';
+import { Users, CalendarDays, RotateCcw, Bell, AlertTriangle, ArrowRight, UserPlus, ClipboardList, MessageSquare } from 'lucide-react';
 import { dashboard } from '@/lib/api';
 import type { DashboardStats } from '@/types';
 
@@ -168,17 +168,17 @@ export default function DashboardPage() {
       {/* Accesos rápidos */}
       <div className="mt-6 grid grid-cols-2 md:grid-cols-4 gap-3">
         {[
-          { href: '/alumnos', label: 'Nuevo alumno', emoji: '👤', color: 'bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border-emerald-200' },
-          { href: '/clases', label: 'Ver clases', emoji: '📋', color: 'bg-blue-50 hover:bg-blue-100 text-blue-700 border-blue-200' },
-          { href: '/recuperaciones', label: 'Recuperaciones', emoji: '🔄', color: 'bg-amber-50 hover:bg-amber-100 text-amber-700 border-amber-200' },
-          { href: '/notificaciones', label: 'Enviar WhatsApp', emoji: '💬', color: 'bg-violet-50 hover:bg-violet-100 text-violet-700 border-violet-200' },
+          { href: '/alumnos',       label: 'Nuevo alumno',    Icon: UserPlus,      color: 'bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border-emerald-200' },
+          { href: '/clases',        label: 'Ver clases',      Icon: CalendarDays,  color: 'bg-blue-50 hover:bg-blue-100 text-blue-700 border-blue-200' },
+          { href: '/recuperaciones',label: 'Recuperaciones',  Icon: RotateCcw,     color: 'bg-amber-50 hover:bg-amber-100 text-amber-700 border-amber-200' },
+          { href: '/notificaciones',label: 'Enviar WhatsApp', Icon: MessageSquare, color: 'bg-violet-50 hover:bg-violet-100 text-violet-700 border-violet-200' },
         ].map((item) => (
           <Link
             key={item.href}
             href={item.href}
             className={`card flex items-center gap-3 px-4 py-3 border transition-colors ${item.color}`}
           >
-            <span className="text-xl">{item.emoji}</span>
+            <item.Icon size={18} />
             <span className="text-sm font-semibold">{item.label}</span>
           </Link>
         ))}
