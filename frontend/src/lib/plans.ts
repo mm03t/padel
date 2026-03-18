@@ -87,9 +87,9 @@ export const PLANS: Record<PlanId, PlanDef> = {
 
 // Which nav routes are available per plan
 export const NAV_ACCESS: Record<PlanId, string[]> = {
-  starter: ['/', '/alumnos', '/clases', '/lista-espera'],
-  club:    ['/', '/alumnos', '/clases', '/lista-espera', '/recuperaciones', '/notificaciones', '/pistas'],
-  elite:   ['/', '/alumnos', '/clases', '/lista-espera', '/recuperaciones', '/notificaciones', '/pistas'],
+  starter: ['/', '/alumnos', '/calendario', '/clases', '/lista-espera'],
+  club:    ['/', '/alumnos', '/calendario', '/clases', '/lista-espera', '/recuperaciones', '/notificaciones', '/pistas'],
+  elite:   ['/', '/alumnos', '/calendario', '/clases', '/lista-espera', '/recuperaciones', '/notificaciones', '/pistas'],
 };
 
 // Feature keys locked per plan

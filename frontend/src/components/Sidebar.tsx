@@ -6,6 +6,7 @@ import {
   LayoutDashboard,
   Users,
   CalendarDays,
+  ClipboardList,
   RotateCcw,
   ListOrdered,
   Dumbbell,
@@ -20,7 +21,8 @@ import { NAV_ACCESS } from '@/lib/plans';
 const nav = [
   { href: '/',               label: 'Dashboard',      icon: LayoutDashboard },
   { href: '/alumnos',        label: 'Alumnos',        icon: Users },
-  { href: '/clases',         label: 'Clases',         icon: CalendarDays },
+  { href: '/calendario',     label: 'Calendario',     icon: CalendarDays },
+  { href: '/clases',         label: 'Clases',         icon: ClipboardList },
   { href: '/lista-espera',   label: 'Lista espera',   icon: ListOrdered },
   { href: '/recuperaciones', label: 'Recuperaciones', icon: RotateCcw },
   { href: '/notificaciones', label: 'Notificaciones', icon: MessageSquare },
