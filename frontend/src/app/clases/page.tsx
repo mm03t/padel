@@ -480,56 +480,59 @@ export default function ClasesPage() {
                                 onClick={(e) => { e.stopPropagation(); setConfirmarQuitar({ claseId: c.id, alumnoId: insc.alumnoId, nombre: `${insc.alumno.nombre} ${insc.alumno.apellidos}` }); }}
                                 disabled={removiendo}
                                 title="Quitar de la clase"
-                                className="p-1.5 rounded-md text-slate-300 opacity-0 group-hover:opacity-100 hover:text-rose-500 hover:bg-rose-50 transition-all disabled:opacity-40 shrink-0"
+                                className="px-2 py-1 rounded-md text-xs font-semibold border border-rose-200 bg-rose-50 text-rose-500 hover:bg-rose-100 hover:border-rose-300 transition-all disabled:opacity-40 shrink-0 flex items-center gap-1"
                               >
-                                {removiendo ? <Loader2 size={13} className="animate-spin" /> : <UserMinus size={13} />}
+                                {removiendo ? <Loader2 size={12} className="animate-spin" /> : <><UserMinus size={12} /> Quitar</>}
                               </button>
                             </div>
                           );
                         })}
                       </div>
                     )}
-                    {plazasLibres > 0 && (
-                      <div className="mt-2">
-                        <p className="text-xs font-bold text-emerald-600 uppercase tracking-wide mb-1.5 flex items-center gap-1">
-                          <UserPlus size={11} /> Añadir alumno ({plazasLibres} plaza{plazasLibres !== 1 ? 's' : ''} libre{plazasLibres !== 1 ? 's' : ''})
-                        </p>
-                        <div className="relative">
-                          <Search size={13} className="absolute left-2.5 top-2.5 text-slate-400" />
-                          <input value={searchText} onChange={(e) => setBuscarAlumno((p) => ({ ...p, [c.id]: e.target.value }))}
-                            onClick={(e) => e.stopPropagation()} placeholder="Buscar alumno por nombre..."
-                            className="w-full pl-7 pr-3 py-2 text-xs rounded-lg border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-100" />
-                        </div>
-                        {searchText.trim() && (() => {
-                          const yaInscritos = new Set(c.inscripciones.filter((i) => i.activo).map((i) => i.alumnoId));
-                          const filtrados = todosAlumnos.filter((a) => {
-                            if (yaInscritos.has(a.id)) return false;
-                            return `${a.nombre} ${a.apellidos}`.toLowerCase().includes(searchText.toLowerCase());
-                          }).slice(0, 6);
-                          return filtrados.length > 0 ? (
-                            <div className="mt-1 rounded-lg border border-slate-200 bg-white shadow-sm overflow-hidden">
-                              {filtrados.map((a) => {
-                                const key = `${c.id}_${a.id}`;
-                                const adding = inscribiendo[key];
-                                return (
-                                  <button key={a.id} onClick={(e) => { e.stopPropagation(); inscribirAlumno(c.id, a.id); }} disabled={adding}
-                                    className="w-full text-left px-3 py-2 text-xs hover:bg-emerald-50 flex items-center justify-between border-b border-slate-100 last:border-0 disabled:opacity-50">
-                                    <div className="flex items-center gap-2">
-                                      <div className="w-6 h-6 rounded-full bg-slate-100 flex items-center justify-center text-[10px] font-bold text-slate-600 shrink-0">
-                                        {a.nombre[0]}{a.apellidos[0]}
-                                      </div>
-                                      <span className="text-slate-700 font-medium">{a.nombre} {a.apellidos}</span>
-                                      <span className="text-slate-400">Niv. {a.nivel.toFixed(1)}</span>
+                    {plazasLibres > 0 && (() => {
+                      const yaInscritos = new Set(c.inscripciones.filter((i) => i.activo).map((i) => i.alumnoId));
+                      const elegibles = todosAlumnos.filter((a) => {
+                        if (yaInscritos.has(a.id)) return false;
+                        if (a.nivel < c.nivelMin - 0.5 || a.nivel > c.nivelMax + 0.5) return false;
+                        if (searchText.trim()) return `${a.nombre} ${a.apellidos}`.toLowerCase().includes(searchText.toLowerCase());
+                        return true;
+                      });
+                      return (
+                        <div className="mt-3 border-t border-slate-100 pt-3">
+                          <p className="text-xs font-bold text-emerald-600 uppercase tracking-wide mb-2 flex items-center gap-1">
+                            <UserPlus size={11} /> Añadir alumno ({plazasLibres} plaza{plazasLibres !== 1 ? 's' : ''} libre{plazasLibres !== 1 ? 's' : ''})
+                          </p>
+                          <div className="relative mb-2">
+                            <Search size={13} className="absolute left-2.5 top-2.5 text-slate-400" />
+                            <input value={searchText} onChange={(e) => setBuscarAlumno((p) => ({ ...p, [c.id]: e.target.value }))}
+                              onClick={(e) => e.stopPropagation()} placeholder="Filtrar alumnos..."
+                              className="w-full pl-7 pr-3 py-2 text-xs rounded-lg border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-100" />
+                          </div>
+                          <div className="max-h-[200px] overflow-y-auto rounded-lg border border-slate-200 bg-white">
+                            {elegibles.length === 0 ? (
+                              <p className="text-xs text-slate-400 italic text-center py-3">Sin alumnos compatibles</p>
+                            ) : elegibles.slice(0, 15).map((a) => {
+                              const key = `${c.id}_${a.id}`;
+                              const adding = inscribiendo[key];
+                              return (
+                                <button key={a.id} onClick={(e) => { e.stopPropagation(); inscribirAlumno(c.id, a.id); }} disabled={adding}
+                                  className="w-full text-left px-3 py-2 text-xs hover:bg-emerald-50 flex items-center justify-between border-b border-slate-100 last:border-0 disabled:opacity-50">
+                                  <div className="flex items-center gap-2">
+                                    <div className="w-6 h-6 rounded-full bg-emerald-50 border border-emerald-200 flex items-center justify-center text-[10px] font-bold text-emerald-700 shrink-0">
+                                      {a.nombre[0]}{a.apellidos[0]}
                                     </div>
-                                    {adding ? <Loader2 size={12} className="animate-spin text-slate-400" /> : <UserPlus size={12} className="text-emerald-500" />}
-                                  </button>
-                                );
-                              })}
-                            </div>
-                          ) : <p className="text-xs text-slate-400 mt-1 italic">Sin resultados</p>;
-                        })()}
-                      </div>
-                    )}
+                                    <span className="text-slate-700 font-medium">{a.nombre} {a.apellidos}</span>
+                                    <span className="text-slate-400">Niv. {a.nivel.toFixed(1)}</span>
+                                  </div>
+                                  {adding ? <Loader2 size={12} className="animate-spin text-slate-400" /> : <UserPlus size={12} className="text-emerald-500" />}
+                                </button>
+                              );
+                            })}
+                          </div>
+                          {elegibles.length > 15 && <p className="text-[10px] text-slate-400 mt-1 text-center">Usa el filtro para ver más ({elegibles.length} alumnos compatibles)</p>}
+                        </div>
+                      );
+                    })()}
                     {plazasLibres <= 0 && (
                       <p className="text-xs text-amber-600 font-medium mt-2 flex items-center gap-1">
                         <AlertCircle size={11} /> Clase completa — no hay plazas disponibles
