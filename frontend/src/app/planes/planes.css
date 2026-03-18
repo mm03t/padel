@@ -201,6 +201,18 @@
   font-weight: 500;
   color: #334155;
   padding: 3px 0;
+  width: 100%;
+  background: none;
+  border: none;
+  font-family: inherit;
+}
+
+.plan-feat-wrap {
+  list-style: none;
+}
+
+.plan-feat-wrap--disabled {
+  /* matches old .plan-feat--disabled */
 }
 
 .plan-feat--disabled {
@@ -213,6 +225,23 @@
 
 .plan-feat-x {
   color: #e2e8f0;
+}
+
+.plan-feat-chevron {
+  color: #94a3b8;
+  transition: transform 0.2s;
+  flex-shrink: 0;
+}
+.plan-feat-chevron--open {
+  transform: rotate(180deg);
+}
+
+.plan-feat-desc {
+  font-size: 0.72rem;
+  color: #64748b;
+  line-height: 1.5;
+  padding: 4px 0 6px 22px;
+  margin: 0;
 }
 
 .plan-extra,

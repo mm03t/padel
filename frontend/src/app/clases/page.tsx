@@ -122,7 +122,7 @@ export default function ClasesPage() {
     }
     if (filtroTurno && getTurno(c.horaInicio) !== filtroTurno) return false;
     return true;
-  }).sort((a, b) => DIA_ORDEN.indexOf(a.diaSemana) - DIA_ORDEN.indexOf(b.diaSemana) || a.horaInicio.localeCompare(b.horaInicio));
+  }).sort((a, b) => a.horaInicio.localeCompare(b.horaInicio) || DIA_ORDEN.indexOf(a.diaSemana) - DIA_ORDEN.indexOf(b.diaSemana));
 
   const hayFiltros = !!(busqueda || filtroProfesor || filtroNivel || filtroTurno);
 

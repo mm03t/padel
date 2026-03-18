@@ -6,7 +6,7 @@ import { es } from 'date-fns/locale';
 import {
   ChevronLeft, ChevronRight, X, Users, AlertCircle, Check, Clock,
   Bell, UserPlus, CheckCircle, Loader2, UserMinus, AlertTriangle,
-  Send, Plus, Lock, CalendarDays, List, LayoutGrid,
+  Send, Plus, Lock, CalendarDays, LayoutGrid,
 } from 'lucide-react';
 import {
   clases as clasesApi, recuperaciones as recuperApi,
@@ -89,7 +89,7 @@ export default function CalendarioPage() {
   const hoy = new Date();
   const [mes, setMes] = useState(hoy.getMonth() + 1);
   const [año, setAño] = useState(hoy.getFullYear());
-  const [vista, setVista] = useState<'dia' | 'semana' | 'mes'>('semana');
+  const [vista, setVista] = useState<'semana' | 'mes'>('semana');
   const [diaSeleccionado, setDiaSeleccionado] = useState(hoy);
   const [clases, setClases] = useState<Clase[]>([]);
   const [loading, setLoading] = useState(true);
@@ -273,14 +273,8 @@ export default function CalendarioPage() {
 
   const navVista = (delta: number) => {
     if (vista === 'mes') { navMes(delta); return; }
-    if (vista === 'semana') {
-      const d = addDays(diaSeleccionado, delta * 7);
-      setDiaSeleccionado(d);
-      setMes(d.getMonth() + 1); setAño(d.getFullYear());
-      return;
-    }
-    // dia
-    const d = addDays(diaSeleccionado, delta);
+    // semana
+    const d = addDays(diaSeleccionado, delta * 7);
     setDiaSeleccionado(d);
     setMes(d.getMonth() + 1); setAño(d.getFullYear());
   };
@@ -366,12 +360,9 @@ export default function CalendarioPage() {
 
   const vistaLabel = (() => {
     if (vista === 'mes') return mesLabel;
-    if (vista === 'semana') {
-      const d0 = weekDays[0]; const d6 = weekDays[6];
-      if (d0.getMonth() === d6.getMonth()) return `${d0.getDate()}–${d6.getDate()} ${format(d0, 'MMMM yyyy', { locale: es })}`;
-      return `${format(d0, 'd MMM', { locale: es })} – ${format(d6, 'd MMM yyyy', { locale: es })}`;
-    }
-    return format(diaSeleccionado, "EEEE d 'de' MMMM yyyy", { locale: es });
+    const d0 = weekDays[0]; const d6 = weekDays[6];
+    if (d0.getMonth() === d6.getMonth()) return `${d0.getDate()}–${d6.getDate()} ${format(d0, 'MMMM yyyy', { locale: es })}`;
+    return `${format(d0, 'd MMM', { locale: es })} – ${format(d6, 'd MMM yyyy', { locale: es })}`;
   })();
 
   if (loading) return <div className="p-8 flex items-center justify-center h-64"><div className="spinner" /></div>;
@@ -390,7 +381,6 @@ export default function CalendarioPage() {
             {/* View toggle */}
             <div className="flex rounded-lg border border-slate-200 overflow-hidden mr-2">
               {([
-                { value: 'dia' as const, label: 'Día', icon: List },
                 { value: 'semana' as const, label: 'Semana', icon: CalendarDays },
                 { value: 'mes' as const, label: 'Mes', icon: LayoutGrid },
               ]).map((v) => (
@@ -511,53 +501,6 @@ export default function CalendarioPage() {
                 );
               })}
             </div>
-          </div>
-        )}
-
-        {/* ── Vista Día ── */}
-        {vista === 'dia' && (
-          <div className="space-y-2">
-            {(() => {
-              const dow = diaSeleccionado.getDay();
-              const clasesDia = clasesDelDia(clases, dow, diaSeleccionado.getFullYear(), diaSeleccionado.getMonth() + 1, diaSeleccionado.getDate())
-                .sort((a, b) => a.horaInicio.localeCompare(b.horaInicio));
-              if (clasesDia.length === 0) return (
-                <div className="card px-6 py-12 text-center">
-                  <CalendarDays size={32} className="text-slate-300 mx-auto mb-3" />
-                  <p className="text-slate-500 font-medium">No hay clases este día</p>
-                  <p className="text-sm text-slate-400 mt-1">Navega a otro día o cambia de vista</p>
-                </div>
-              );
-              return clasesDia.map((clase) => {
-                const pal = getProfPalette(clase.profesorId, profesorIds);
-                const activos = clase.inscripciones.filter((i) => i.activo);
-                const panelActive = panel?.clase.id === clase.id;
-                return (
-                  <button key={clase.id} onClick={() => abrirPanel(clase, diaSeleccionado.getDate(), diaSeleccionado.getMonth() + 1, diaSeleccionado.getFullYear())}
-                    className={`card w-full text-left px-5 py-4 flex items-center gap-4 transition-all hover:shadow-md ${panelActive ? 'ring-2 ring-[#1e83ec]' : ''}`}>
-                    <div className="w-12 h-12 rounded-xl flex items-center justify-center shrink-0" style={{ background: pal.bg, borderColor: pal.border }}>
-                      <span className="text-base font-black" style={{ color: pal.text }}>{clase.nombre.slice(0, 2).toUpperCase()}</span>
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <h3 className="font-bold text-slate-800 text-base">{clase.nombre}</h3>
-                      <p className="text-sm text-slate-500">{clase.horaInicio}–{clase.horaFin} · Pista {clase.pista.numero}</p>
-                    </div>
-                    <div className="flex items-center gap-2.5 shrink-0">
-                      <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-black shrink-0" style={{ background: pal.bg, color: pal.text }}>
-                        {clase.profesor.nombre[0]}{clase.profesor.apellidos[0]}
-                      </div>
-                      <span className="text-xs font-medium text-slate-600">{clase.profesor.nombre}</span>
-                    </div>
-                    <div className="flex items-center gap-1.5 shrink-0">
-                      <Users size={14} className="text-slate-400" />
-                      <span className={`text-sm font-bold ${activos.length >= clase.plazasTotal ? 'text-rose-500' : 'text-emerald-600'}`}>
-                        {activos.length}/{clase.plazasTotal}
-                      </span>
-                    </div>
-                  </button>
-                );
-              });
-            })()}
           </div>
         )}
       </div>
