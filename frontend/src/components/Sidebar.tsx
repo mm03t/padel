@@ -11,6 +11,8 @@ import {
   Dumbbell,
   ArrowLeftRight,
   Lock,
+  MessageSquare,
+  MapPin,
 } from 'lucide-react';
 import { usePlan } from '@/components/PlanContext';
 import { NAV_ACCESS } from '@/lib/plans';
@@ -21,6 +23,8 @@ const nav = [
   { href: '/clases',         label: 'Clases',         icon: CalendarDays },
   { href: '/lista-espera',   label: 'Lista espera',   icon: ListOrdered },
   { href: '/recuperaciones', label: 'Recuperaciones', icon: RotateCcw },
+  { href: '/notificaciones', label: 'Notificaciones', icon: MessageSquare },
+  { href: '/pistas',         label: 'Vista diaria',   icon: MapPin },
 ];
 
 export default function Sidebar() {

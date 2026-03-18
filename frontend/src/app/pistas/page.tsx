@@ -11,6 +11,7 @@ import {
 import * as api from '@/lib/api';
 import type { Clase, ListaEspera, Alumno, CandidatosHueco } from '@/types';
 import ModalNotificacion from '@/components/ModalNotificacion';
+import UpgradeGate from '@/components/UpgradeGate';
 
 // ── Colores por pista ──────────────────────────────────────────────────────────
 const PISTA_COLORS: Record<number, { bg: string; court: string; lines: string; text: string; badge: string }> = {
@@ -84,6 +85,14 @@ interface PanelData {
 
 // ── Componente principal ───────────────────────────────────────────────────────
 export default function PistasPage() {
+  return (
+    <UpgradeGate feature="vistadiaria">
+      <PistasContent />
+    </UpgradeGate>
+  );
+}
+
+function PistasContent() {
   const [fecha, setFecha] = useState(new Date());
   const [clases, setClases] = useState<ClaseConEspera[]>([]);
   const [cargando, setCargando] = useState(true);

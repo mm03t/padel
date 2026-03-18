@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { UserPlus, Search, Pencil, Power, CheckCircle, Clock, Zap, ChevronUp, ChevronDown, Trash2, Loader2, EuroIcon, Banknote, CreditCard } from 'lucide-react';
 import { alumnos as api } from '@/lib/api';
+import { usePlan } from '@/components/PlanContext';
+import { canAccess } from '@/lib/plans';
 import type { Alumno, Disponibilidad, ClaseDisponible } from '@/types';
 
 const NIVELES = [1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0];
@@ -25,6 +27,10 @@ const EMPTY: Partial<Alumno> = {
 };
 
 export default function AlumnosPage() {
+  const { plan } = usePlan();
+  const hasPagos = plan ? canAccess(plan, 'pagos') : false;
+  const hasRecup = plan ? canAccess(plan, 'recuperaciones') : false;
+
   const [lista, setLista] = useState<Alumno[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -302,12 +308,12 @@ export default function AlumnosPage() {
                   ['nivel',          'Nivel',         'px-3'],
                   ['disponibilidad', 'Disponibilidad','px-3'],
                   ['clase',          'Clase',         'px-3'],
-                  ['recuperaciones', 'Recup. pend.',  'px-3'],
-                  ['pago',           'Pago',          'px-3'],
+                  ...(hasRecup ? [['recuperaciones', 'Recup. pend.',  'px-3'] as const] : []),
+                  ...(hasPagos ? [['pago',           'Pago',          'px-3'] as const] : []),
                 ] as const).map(([col, label, pad]) => (
                   <th
                     key={col}
-                    onClick={() => toggleSort(col)}
+                    onClick={() => toggleSort(col as typeof sortCol)}
                     className={`text-left ${pad} py-3 font-semibold text-slate-500 text-xs uppercase cursor-pointer select-none hover:text-slate-700 transition-colors`}
                   >
                     <span className="inline-flex items-center gap-1">
@@ -327,7 +333,7 @@ export default function AlumnosPage() {
                 const sinClase = clasesActivas.length === 0 && a.activo;
                 return (
                   <tr key={a.id} className={`transition-colors ${
-                    !a.pagoAlDia
+                    hasPagos && !a.pagoAlDia
                       ? 'bg-rose-50/60 hover:bg-rose-50'
                       : 'hover:bg-slate-50/60'
                   }`}>
@@ -350,25 +356,29 @@ export default function AlumnosPage() {
                           ? clasesActivas.map((i) => i.clase.nombre).join(', ')
                           : <span className="text-slate-300">—</span>}
                     </td>
-                    <td className="px-3 py-3.5">
-                      {a._count && a._count.recuperaciones > 0
-                        ? <span className="badge badge-yellow">{a._count.recuperaciones}</span>
-                        : <span className="text-slate-300 text-xs">—</span>}
-                    </td>
-                    <td className="px-3 py-3.5">
-                      <button
-                        onClick={() => abrirModalPago(a)}
-                        title={a.pagoAlDia ? 'Al corriente — clic para cambiar' : 'Pago pendiente — clic para registrar pago'}
-                        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold border transition-colors cursor-pointer ${
-                          a.pagoAlDia
-                            ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100'
-                            : 'bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100'
-                        }`}
-                      >
-                        <EuroIcon size={10} />
-                        {a.pagoAlDia ? 'Al día' : 'Pendiente'}
-                      </button>
-                    </td>
+                    {hasRecup && (
+                      <td className="px-3 py-3.5">
+                        {a._count && a._count.recuperaciones > 0
+                          ? <span className="badge badge-yellow">{a._count.recuperaciones}</span>
+                          : <span className="text-slate-300 text-xs">—</span>}
+                      </td>
+                    )}
+                    {hasPagos && (
+                      <td className="px-3 py-3.5">
+                        <button
+                          onClick={() => abrirModalPago(a)}
+                          title={a.pagoAlDia ? 'Al corriente — clic para cambiar' : 'Pago pendiente — clic para registrar pago'}
+                          className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold border transition-colors cursor-pointer ${
+                            a.pagoAlDia
+                              ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100'
+                              : 'bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100'
+                          }`}
+                        >
+                          <EuroIcon size={10} />
+                          {a.pagoAlDia ? 'Al día' : 'Pendiente'}
+                        </button>
+                      </td>
+                    )}
                     <td className="px-3 py-3.5">
                       <div className="flex gap-1 justify-end">
                         <button onClick={() => abrirEditar(a)} className="btn btn-ghost p-2" title="Editar">

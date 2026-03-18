@@ -3,10 +3,12 @@
 import { useEffect, useState, useCallback } from 'react';
 import { format, getDaysInMonth, startOfMonth, getDay } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { ChevronLeft, ChevronRight, X, Users, AlertCircle, Check, Clock, Bell, UserPlus, CheckCircle, Loader2, UserMinus, AlertTriangle, Send, Plus, Trash2, List, CalendarDays, Trophy } from 'lucide-react';
+import { ChevronLeft, ChevronRight, X, Users, AlertCircle, Check, Clock, Bell, UserPlus, CheckCircle, Loader2, UserMinus, AlertTriangle, Send, Plus, Trash2, List, CalendarDays, Trophy, Lock } from 'lucide-react';
 import { clases as clasesApi, recuperaciones as recuperApi, listaEspera as listaEsperaApi, alumnos as alumnosApi, notificaciones as notifApi, profesores as profesoresApi, pistas as pistasApi } from '@/lib/api';
 import type { Clase, DiaSemana, ListaEspera, Alumno, CandidatosHueco, Profesor, Pista } from '@/types';
 import ModalNotificacion from '@/components/ModalNotificacion';
+import { usePlan } from '@/components/PlanContext';
+import { canAccess } from '@/lib/plans';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -73,6 +75,9 @@ interface PanelInfo {
 }
 
 export default function ClasesPage() {
+  const { plan } = usePlan();
+  const hasFaltas = plan ? canAccess(plan, 'faltas') : false;
+
   const hoy = new Date();
   const [mes, setMes] = useState(hoy.getMonth() + 1);
   const [año, setAño] = useState(hoy.getFullYear());
@@ -725,14 +730,23 @@ export default function ClasesPage() {
                           </div>
                         ) : (
                           <div className="flex items-center gap-1 shrink-0">
-                            <button
-                              onClick={() => notificarFalta(insc.alumnoId)}
-                              disabled={cargando}
-                              title="Registrar falta puntual — genera recuperación"
-                              className="text-xs font-medium px-2 py-1 rounded-md border border-slate-200 bg-white text-slate-500 hover:border-amber-300 hover:text-amber-700 hover:bg-amber-50 transition-colors disabled:opacity-40"
-                            >
-                              {cargando ? '...' : 'Falta'}
-                            </button>
+                            {hasFaltas ? (
+                              <button
+                                onClick={() => notificarFalta(insc.alumnoId)}
+                                disabled={cargando}
+                                title="Registrar falta puntual — genera recuperación"
+                                className="text-xs font-medium px-2 py-1 rounded-md border border-slate-200 bg-white text-slate-500 hover:border-amber-300 hover:text-amber-700 hover:bg-amber-50 transition-colors disabled:opacity-40"
+                              >
+                                {cargando ? '...' : 'Falta'}
+                              </button>
+                            ) : (
+                              <span
+                                title="Registrar faltas está disponible en el plan Club"
+                                className="text-xs font-medium px-2 py-1 rounded-md border border-slate-100 bg-slate-50 text-slate-300 cursor-not-allowed inline-flex items-center gap-1"
+                              >
+                                Falta <Lock size={10} />
+                              </span>
+                            )}
                             <button
                               onClick={() => quitarDeClase(insc.alumnoId)}
                               disabled={quitando[insc.alumnoId]}

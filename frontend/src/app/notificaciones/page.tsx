@@ -6,8 +6,17 @@ import { es } from 'date-fns/locale';
 import { MessageCircle, Send, Users, RefreshCw, Check } from 'lucide-react';
 import { notificaciones as api } from '@/lib/api';
 import type { PlazaLibre, Alumno } from '@/types';
+import UpgradeGate from '@/components/UpgradeGate';
 
 export default function NotificacionesPage() {
+  return (
+    <UpgradeGate feature="notificaciones">
+      <NotificacionesContent />
+    </UpgradeGate>
+  );
+}
+
+function NotificacionesContent() {
   const [plazas, setPlazas] = useState<PlazaLibre[] | null>(null);
   const [detectando, setDetectando] = useState(false);
   const [seleccionada, setSeleccionada] = useState<PlazaLibre | null>(null);
