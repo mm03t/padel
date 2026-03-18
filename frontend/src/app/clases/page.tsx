@@ -6,7 +6,7 @@ import { es } from 'date-fns/locale';
 import {
   Search, Filter, Users, Trophy, Clock, Trash2, ChevronDown, ChevronUp,
   Plus, X, AlertCircle, CheckCircle, Loader2, UserPlus, Sun, Moon, Blend,
-  Check, Lock,
+  Check, UserMinus,
 } from 'lucide-react';
 import {
   clases as clasesApi, alumnos as alumnosApi,
@@ -48,6 +48,7 @@ function getTurno(hora: string): 'mañana' | 'tarde' {
 export default function ClasesPage() {
   const { plan } = usePlan();
   const [clases, setClases] = useState<Clase[]>([]);
+  const [todosAlumnos, setTodosAlumnos] = useState<Alumno[]>([]);
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState('');
 
@@ -59,6 +60,12 @@ export default function ClasesPage() {
 
   // Expand
   const [expandido, setExpandido] = useState<Set<string>>(new Set());
+
+  // Student management
+  const [buscarAlumno, setBuscarAlumno] = useState<Record<string, string>>({});
+  const [inscribiendo, setInscribiendo] = useState<Record<string, boolean>>({});
+  const [quitandoAlumno, setQuitandoAlumno] = useState<Record<string, boolean>>({});
+  const [confirmarQuitar, setConfirmarQuitar] = useState<{ claseId: string; alumnoId: string; nombre: string } | null>(null);
 
   // Delete modal
   const [confirmarEliminar, setConfirmarEliminar] = useState<Clase | null>(null);
@@ -93,6 +100,7 @@ export default function ClasesPage() {
 
   useEffect(() => {
     clasesApi.list({ activa: 'true' }).then(setClases).finally(() => setLoading(false));
+    alumnosApi.list({ activo: 'true' }).then(setTodosAlumnos);
   }, []);
 
   const profesorIds = [...new Set(clases.map((c) => c.profesorId))];
@@ -124,6 +132,43 @@ export default function ClasesPage() {
       if (next.has(id)) next.delete(id); else next.add(id);
       return next;
     });
+  };
+
+  /* ── Student management ── */
+  const quitarAlumno = async (claseId: string, alumnoId: string) => {
+    const key = `${claseId}_${alumnoId}`;
+    setQuitandoAlumno((p) => ({ ...p, [key]: true }));
+    try {
+      await clasesApi.desinscribir(claseId, alumnoId);
+      setClases((prev) =>
+        prev.map((c) =>
+          c.id !== claseId ? c : { ...c, inscripciones: c.inscripciones.map((i) => i.alumnoId === alumnoId ? { ...i, activo: false } : i) },
+        ),
+      );
+      setToast('Alumno quitado de la clase ✓');
+      setTimeout(() => setToast(''), 2500);
+    } catch {
+      setToast('Error al quitar al alumno');
+      setTimeout(() => setToast(''), 3000);
+    }
+    setQuitandoAlumno((p) => ({ ...p, [key]: false }));
+  };
+
+  const inscribirAlumno = async (claseId: string, alumnoId: string) => {
+    const key = `${claseId}_${alumnoId}`;
+    setInscribiendo((p) => ({ ...p, [key]: true }));
+    try {
+      await clasesApi.inscribir(claseId, alumnoId);
+      const updated = await clasesApi.get(claseId);
+      setClases((prev) => prev.map((c) => c.id === claseId ? updated : c));
+      setBuscarAlumno((p) => ({ ...p, [claseId]: '' }));
+      setToast('Alumno inscrito en la clase ✓');
+      setTimeout(() => setToast(''), 2500);
+    } catch (e: any) {
+      setToast(e.message ?? 'Error al inscribir');
+      setTimeout(() => setToast(''), 3000);
+    }
+    setInscribiendo((p) => ({ ...p, [key]: false }));
   };
 
   /* ── Delete ── */
@@ -348,6 +393,8 @@ export default function ClasesPage() {
             const activos = c.inscripciones.filter((i) => i.activo);
             const abierto = expandido.has(c.id);
             const turno = getTurno(c.horaInicio);
+            const plazasLibres = c.plazasTotal - activos.length;
+            const searchText = buscarAlumno[c.id] ?? '';
             return (
               <div key={c.id} className="card overflow-hidden transition-shadow hover:shadow-md">
                 {/* Row principal */}
@@ -401,38 +448,117 @@ export default function ClasesPage() {
                   </div>
                 </div>
 
-                {/* Expandido: alumnos */}
+                {/* Expandido: gestión de alumnos */}
                 {abierto && (
-                  <div className="px-5 pb-4 pt-0 border-t border-slate-100">
-                    <p className="text-xs font-bold text-slate-400 uppercase tracking-wide mt-3 mb-2">
-                      Alumnos inscritos ({activos.length})
-                    </p>
+                  <div className="px-5 pb-5 pt-0 border-t border-slate-100">
+                    <div className="flex items-center justify-between mt-3 mb-3">
+                      <p className="text-xs font-bold text-slate-400 uppercase tracking-wide">
+                        Alumnos inscritos ({activos.length}/{c.plazasTotal})
+                      </p>
+                      <div className="flex items-center gap-2 text-xs text-slate-400">
+                        <Clock size={11} />
+                        <span>Pista {c.pista.numero} — {c.pista.nombre}</span>
+                      </div>
+                    </div>
                     {activos.length === 0 ? (
                       <p className="text-sm text-slate-400 italic py-2">Sin alumnos inscritos</p>
                     ) : (
-                      <div className="grid grid-cols-2 gap-2">
-                        {activos.map((insc) => (
-                          <div key={insc.id} className="flex items-center gap-2.5 px-3 py-2 rounded-lg bg-slate-50 border border-slate-100">
-                            <div className="w-7 h-7 rounded-full bg-white border border-slate-200 flex items-center justify-center text-xs font-bold text-slate-600 shrink-0">
-                              {insc.alumno.nombre[0]}{insc.alumno.apellidos[0]}
+                      <div className="grid grid-cols-2 gap-2 mb-3">
+                        {activos.map((insc) => {
+                          const key = `${c.id}_${insc.alumnoId}`;
+                          const removiendo = quitandoAlumno[key];
+                          return (
+                            <div key={insc.id} className="flex items-center gap-2.5 px-3 py-2.5 rounded-lg bg-slate-50 border border-slate-100 group">
+                              <div className="w-7 h-7 rounded-full bg-white border border-slate-200 flex items-center justify-center text-xs font-bold text-slate-600 shrink-0">
+                                {insc.alumno.nombre[0]}{insc.alumno.apellidos[0]}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-semibold text-slate-700 truncate">{insc.alumno.nombre} {insc.alumno.apellidos}</p>
+                                <p className="text-xs text-slate-400">Niv. {insc.alumno.nivel.toFixed(1)}</p>
+                              </div>
+                              <button
+                                onClick={(e) => { e.stopPropagation(); setConfirmarQuitar({ claseId: c.id, alumnoId: insc.alumnoId, nombre: `${insc.alumno.nombre} ${insc.alumno.apellidos}` }); }}
+                                disabled={removiendo}
+                                title="Quitar de la clase"
+                                className="p-1.5 rounded-md text-slate-300 opacity-0 group-hover:opacity-100 hover:text-rose-500 hover:bg-rose-50 transition-all disabled:opacity-40 shrink-0"
+                              >
+                                {removiendo ? <Loader2 size={13} className="animate-spin" /> : <UserMinus size={13} />}
+                              </button>
                             </div>
-                            <div className="flex-1 min-w-0">
-                              <p className="text-sm font-semibold text-slate-700 truncate">{insc.alumno.nombre} {insc.alumno.apellidos}</p>
-                              <p className="text-xs text-slate-400">Niv. {insc.alumno.nivel.toFixed(1)}</p>
-                            </div>
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     )}
-                    <div className="mt-3 flex items-center gap-2 text-xs text-slate-400">
-                      <Clock size={11} />
-                      <span>Pista {c.pista.numero} — {c.pista.nombre}</span>
-                    </div>
+                    {plazasLibres > 0 && (
+                      <div className="mt-2">
+                        <p className="text-xs font-bold text-emerald-600 uppercase tracking-wide mb-1.5 flex items-center gap-1">
+                          <UserPlus size={11} /> Añadir alumno ({plazasLibres} plaza{plazasLibres !== 1 ? 's' : ''} libre{plazasLibres !== 1 ? 's' : ''})
+                        </p>
+                        <div className="relative">
+                          <Search size={13} className="absolute left-2.5 top-2.5 text-slate-400" />
+                          <input value={searchText} onChange={(e) => setBuscarAlumno((p) => ({ ...p, [c.id]: e.target.value }))}
+                            onClick={(e) => e.stopPropagation()} placeholder="Buscar alumno por nombre..."
+                            className="w-full pl-7 pr-3 py-2 text-xs rounded-lg border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-100" />
+                        </div>
+                        {searchText.trim() && (() => {
+                          const yaInscritos = new Set(c.inscripciones.filter((i) => i.activo).map((i) => i.alumnoId));
+                          const filtrados = todosAlumnos.filter((a) => {
+                            if (yaInscritos.has(a.id)) return false;
+                            return `${a.nombre} ${a.apellidos}`.toLowerCase().includes(searchText.toLowerCase());
+                          }).slice(0, 6);
+                          return filtrados.length > 0 ? (
+                            <div className="mt-1 rounded-lg border border-slate-200 bg-white shadow-sm overflow-hidden">
+                              {filtrados.map((a) => {
+                                const key = `${c.id}_${a.id}`;
+                                const adding = inscribiendo[key];
+                                return (
+                                  <button key={a.id} onClick={(e) => { e.stopPropagation(); inscribirAlumno(c.id, a.id); }} disabled={adding}
+                                    className="w-full text-left px-3 py-2 text-xs hover:bg-emerald-50 flex items-center justify-between border-b border-slate-100 last:border-0 disabled:opacity-50">
+                                    <div className="flex items-center gap-2">
+                                      <div className="w-6 h-6 rounded-full bg-slate-100 flex items-center justify-center text-[10px] font-bold text-slate-600 shrink-0">
+                                        {a.nombre[0]}{a.apellidos[0]}
+                                      </div>
+                                      <span className="text-slate-700 font-medium">{a.nombre} {a.apellidos}</span>
+                                      <span className="text-slate-400">Niv. {a.nivel.toFixed(1)}</span>
+                                    </div>
+                                    {adding ? <Loader2 size={12} className="animate-spin text-slate-400" /> : <UserPlus size={12} className="text-emerald-500" />}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          ) : <p className="text-xs text-slate-400 mt-1 italic">Sin resultados</p>;
+                        })()}
+                      </div>
+                    )}
+                    {plazasLibres <= 0 && (
+                      <p className="text-xs text-amber-600 font-medium mt-2 flex items-center gap-1">
+                        <AlertCircle size={11} /> Clase completa — no hay plazas disponibles
+                      </p>
+                    )}
                   </div>
                 )}
               </div>
             );
           })}
+        </div>
+      )}
+
+      {/* ── Modal Confirmar Quitar Alumno ── */}
+      {confirmarQuitar && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm">
+            <div className="px-6 py-5">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-10 h-10 rounded-xl bg-rose-50 flex items-center justify-center shrink-0"><UserMinus size={18} className="text-rose-500" /></div>
+                <h2 className="font-black text-slate-800 text-base">Quitar de la clase</h2>
+              </div>
+              <p className="text-sm text-slate-500">¿Seguro que quieres quitar a <strong className="text-slate-700">{confirmarQuitar.nombre}</strong> de esta clase?</p>
+            </div>
+            <div className="px-6 py-4 border-t border-slate-100 flex justify-end gap-2">
+              <button onClick={() => setConfirmarQuitar(null)} className="px-4 py-2 rounded-xl text-sm font-semibold border border-slate-200 text-slate-500 hover:bg-slate-50">Cancelar</button>
+              <button onClick={() => { quitarAlumno(confirmarQuitar.claseId, confirmarQuitar.alumnoId); setConfirmarQuitar(null); }} className="px-4 py-2 rounded-xl text-sm font-bold text-white bg-rose-500 hover:bg-rose-600 transition-colors">Sí, quitar</button>
+            </div>
+          </div>
         </div>
       )}
 

@@ -1,12 +1,12 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { format, getDaysInMonth, startOfMonth, getDay } from 'date-fns';
+import { format, getDaysInMonth, startOfMonth, getDay, addDays, startOfWeek as dateFnsStartOfWeek } from 'date-fns';
 import { es } from 'date-fns/locale';
 import {
   ChevronLeft, ChevronRight, X, Users, AlertCircle, Check, Clock,
   Bell, UserPlus, CheckCircle, Loader2, UserMinus, AlertTriangle,
-  Send, Plus, Lock,
+  Send, Plus, Lock, CalendarDays, List, LayoutGrid,
 } from 'lucide-react';
 import {
   clases as clasesApi, recuperaciones as recuperApi,
@@ -89,6 +89,8 @@ export default function CalendarioPage() {
   const hoy = new Date();
   const [mes, setMes] = useState(hoy.getMonth() + 1);
   const [año, setAño] = useState(hoy.getFullYear());
+  const [vista, setVista] = useState<'dia' | 'semana' | 'mes'>('semana');
+  const [diaSeleccionado, setDiaSeleccionado] = useState(hoy);
   const [clases, setClases] = useState<Clase[]>([]);
   const [loading, setLoading] = useState(true);
   const [panel, setPanel] = useState<PanelInfo | null>(null);
@@ -269,9 +271,38 @@ export default function CalendarioPage() {
     setMes(nm); setAño(na);
   };
 
-  const abrirPanel = (clase: Clase, dia: number) => {
-    const fechaStr = `${año}-${String(mes).padStart(2, '0')}-${String(dia).padStart(2, '0')}`;
-    setPanel({ clase, dia, mes, año, fechaStr, listaEspera: undefined, cargandoEspera: true });
+  const navVista = (delta: number) => {
+    if (vista === 'mes') { navMes(delta); return; }
+    if (vista === 'semana') {
+      const d = addDays(diaSeleccionado, delta * 7);
+      setDiaSeleccionado(d);
+      setMes(d.getMonth() + 1); setAño(d.getFullYear());
+      return;
+    }
+    // dia
+    const d = addDays(diaSeleccionado, delta);
+    setDiaSeleccionado(d);
+    setMes(d.getMonth() + 1); setAño(d.getFullYear());
+  };
+
+  const irAHoy = () => {
+    const h = new Date();
+    setDiaSeleccionado(h);
+    setMes(h.getMonth() + 1); setAño(h.getFullYear());
+  };
+
+  // Week calculation for semana view
+  const getWeekDays = (ref: Date): Date[] => {
+    const start = dateFnsStartOfWeek(ref, { weekStartsOn: 1 });
+    return Array.from({ length: 7 }, (_, i) => addDays(start, i));
+  };
+  const weekDays = getWeekDays(diaSeleccionado);
+
+  const abrirPanel = (clase: Clase, dia: number, mesOverride?: number, añoOverride?: number) => {
+    const m = mesOverride ?? mes;
+    const a = añoOverride ?? año;
+    const fechaStr = `${a}-${String(m).padStart(2, '0')}-${String(dia).padStart(2, '0')}`;
+    setPanel({ clase, dia, mes: m, año: a, fechaStr, listaEspera: undefined, cargandoEspera: true });
     setRegistrado({});
     setBuscarEspera('');
     listaEsperaApi.list(clase.id).then((le) => {
@@ -333,6 +364,16 @@ export default function CalendarioPage() {
   const esHoy = (dia: number) => dia === hoy.getDate() && mes === hoy.getMonth() + 1 && año === hoy.getFullYear();
   const isPast = (dia: number) => { const d = new Date(año, mes - 1, dia); d.setHours(23, 59, 59); return d < hoy; };
 
+  const vistaLabel = (() => {
+    if (vista === 'mes') return mesLabel;
+    if (vista === 'semana') {
+      const d0 = weekDays[0]; const d6 = weekDays[6];
+      if (d0.getMonth() === d6.getMonth()) return `${d0.getDate()}–${d6.getDate()} ${format(d0, 'MMMM yyyy', { locale: es })}`;
+      return `${format(d0, 'd MMM', { locale: es })} – ${format(d6, 'd MMM yyyy', { locale: es })}`;
+    }
+    return format(diaSeleccionado, "EEEE d 'de' MMMM yyyy", { locale: es });
+  })();
+
   if (loading) return <div className="p-8 flex items-center justify-center h-64"><div className="spinner" /></div>;
 
   return (
@@ -342,13 +383,26 @@ export default function CalendarioPage() {
         {/* Header */}
         <div className="flex items-center justify-between mb-5">
           <div>
-            <h1 className="text-2xl font-black text-slate-800 capitalize">{mesLabel}</h1>
+            <h1 className="text-2xl font-black text-slate-800 capitalize">{vistaLabel}</h1>
             <p className="text-sm text-slate-400 mt-0.5">{clases.length} clases activas · Haz clic en una clase para ver detalles</p>
           </div>
           <div className="flex items-center gap-2">
-            <button onClick={() => navMes(-1)} className="btn btn-secondary px-2 py-2"><ChevronLeft size={16} /></button>
-            <button onClick={() => { setMes(hoy.getMonth() + 1); setAño(hoy.getFullYear()); }} className="btn btn-secondary text-xs">Hoy</button>
-            <button onClick={() => navMes(1)} className="btn btn-secondary px-2 py-2"><ChevronRight size={16} /></button>
+            {/* View toggle */}
+            <div className="flex rounded-lg border border-slate-200 overflow-hidden mr-2">
+              {([
+                { value: 'dia' as const, label: 'Día', icon: List },
+                { value: 'semana' as const, label: 'Semana', icon: CalendarDays },
+                { value: 'mes' as const, label: 'Mes', icon: LayoutGrid },
+              ]).map((v) => (
+                <button key={v.value} onClick={() => setVista(v.value)}
+                  className={`flex items-center gap-1 px-3 py-2 text-xs font-semibold transition-colors border-r border-slate-200 last:border-r-0 ${vista === v.value ? 'bg-[#1e83ec] text-white' : 'bg-white text-slate-500 hover:bg-slate-50'}`}>
+                  <v.icon size={12} /> {v.label}
+                </button>
+              ))}
+            </div>
+            <button onClick={() => navVista(-1)} className="btn btn-secondary px-2 py-2"><ChevronLeft size={16} /></button>
+            <button onClick={irAHoy} className="btn btn-secondary text-xs">Hoy</button>
+            <button onClick={() => navVista(1)} className="btn btn-secondary px-2 py-2"><ChevronRight size={16} /></button>
             <button onClick={abrirModalNueva} className="btn btn-primary flex items-center gap-1.5 ml-2">
               <Plus size={15} /> Nueva clase
             </button>
@@ -368,7 +422,8 @@ export default function CalendarioPage() {
           })}
         </div>
 
-        {/* Calendario grid */}
+        {/* ── Vista Mes ── */}
+        {vista === 'mes' && (
         <div className="card overflow-hidden">
           <div className="grid grid-cols-7 bg-slate-50 border-b border-slate-100">
             {DIAS_HEADER.map((d) => (
@@ -413,6 +468,98 @@ export default function CalendarioPage() {
             </div>
           ))}
         </div>
+        )}
+
+        {/* ── Vista Semana ── */}
+        {vista === 'semana' && (
+          <div className="card overflow-hidden">
+            <div className="grid grid-cols-7 bg-slate-50 border-b border-slate-100">
+              {weekDays.map((d, i) => {
+                const isToday = d.toDateString() === hoy.toDateString();
+                return (
+                  <div key={i} className={`py-2.5 text-center ${isToday ? 'bg-blue-50' : ''}`}>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">{DIAS_HEADER[i]}</p>
+                    <p className={`text-sm font-black mt-0.5 ${isToday ? 'text-[#1e83ec]' : 'text-slate-700'}`}>{d.getDate()}</p>
+                  </div>
+                );
+              })}
+            </div>
+            <div className="grid grid-cols-7 divide-x divide-slate-50">
+              {weekDays.map((d, i) => {
+                const dow = d.getDay();
+                const clasesDia = clasesDelDia(clases, dow, d.getFullYear(), d.getMonth() + 1, d.getDate());
+                const isToday = d.toDateString() === hoy.toDateString();
+                const past = d < hoy && !isToday;
+                return (
+                  <div key={i} className={`min-h-[340px] p-2 ${isToday ? 'bg-blue-50/30' : ''}`}>
+                    <div className="space-y-1.5">
+                      {clasesDia.sort((a, b) => a.horaInicio.localeCompare(b.horaInicio)).map((clase) => {
+                        const pal = getProfPalette(clase.profesorId, profesorIds);
+                        const activos = clase.inscripciones.filter((ins) => ins.activo).length;
+                        const panelActive = panel?.clase.id === clase.id && panel?.dia === d.getDate();
+                        return (
+                          <button key={clase.id} onClick={() => abrirPanel(clase, d.getDate(), d.getMonth() + 1, d.getFullYear())} className="w-full text-left rounded-lg px-2.5 py-2 text-xs leading-snug transition-all border"
+                            style={{ background: panelActive ? pal.dot : pal.bg, color: panelActive ? '#fff' : pal.text, borderColor: panelActive ? pal.dot : pal.border, opacity: past ? 0.55 : 1 }}>
+                            <p className="font-bold">{clase.horaInicio}–{clase.horaFin}</p>
+                            <p className="font-semibold truncate mt-0.5">{clase.nombre}</p>
+                            <p className="opacity-75 truncate mt-0.5">{clase.profesor.nombre.split(' ')[0]} · {activos}/{clase.plazasTotal}</p>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* ── Vista Día ── */}
+        {vista === 'dia' && (
+          <div className="space-y-2">
+            {(() => {
+              const dow = diaSeleccionado.getDay();
+              const clasesDia = clasesDelDia(clases, dow, diaSeleccionado.getFullYear(), diaSeleccionado.getMonth() + 1, diaSeleccionado.getDate())
+                .sort((a, b) => a.horaInicio.localeCompare(b.horaInicio));
+              if (clasesDia.length === 0) return (
+                <div className="card px-6 py-12 text-center">
+                  <CalendarDays size={32} className="text-slate-300 mx-auto mb-3" />
+                  <p className="text-slate-500 font-medium">No hay clases este día</p>
+                  <p className="text-sm text-slate-400 mt-1">Navega a otro día o cambia de vista</p>
+                </div>
+              );
+              return clasesDia.map((clase) => {
+                const pal = getProfPalette(clase.profesorId, profesorIds);
+                const activos = clase.inscripciones.filter((i) => i.activo);
+                const panelActive = panel?.clase.id === clase.id;
+                return (
+                  <button key={clase.id} onClick={() => abrirPanel(clase, diaSeleccionado.getDate(), diaSeleccionado.getMonth() + 1, diaSeleccionado.getFullYear())}
+                    className={`card w-full text-left px-5 py-4 flex items-center gap-4 transition-all hover:shadow-md ${panelActive ? 'ring-2 ring-[#1e83ec]' : ''}`}>
+                    <div className="w-12 h-12 rounded-xl flex items-center justify-center shrink-0" style={{ background: pal.bg, borderColor: pal.border }}>
+                      <span className="text-base font-black" style={{ color: pal.text }}>{clase.nombre.slice(0, 2).toUpperCase()}</span>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-bold text-slate-800 text-base">{clase.nombre}</h3>
+                      <p className="text-sm text-slate-500">{clase.horaInicio}–{clase.horaFin} · Pista {clase.pista.numero}</p>
+                    </div>
+                    <div className="flex items-center gap-2.5 shrink-0">
+                      <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-black shrink-0" style={{ background: pal.bg, color: pal.text }}>
+                        {clase.profesor.nombre[0]}{clase.profesor.apellidos[0]}
+                      </div>
+                      <span className="text-xs font-medium text-slate-600">{clase.profesor.nombre}</span>
+                    </div>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <Users size={14} className="text-slate-400" />
+                      <span className={`text-sm font-bold ${activos.length >= clase.plazasTotal ? 'text-rose-500' : 'text-emerald-600'}`}>
+                        {activos.length}/{clase.plazasTotal}
+                      </span>
+                    </div>
+                  </button>
+                );
+              });
+            })()}
+          </div>
+        )}
       </div>
 
       {/* ── Panel lateral ── */}
