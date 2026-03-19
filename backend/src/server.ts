@@ -36,6 +36,17 @@ app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', app: 'Academia Pádel API', ts: new Date().toISOString() });
 });
 
+// Endpoint para ejecutar seed (solo demo)
+app.post('/api/seed', async (_req, res) => {
+  try {
+    const { execSync } = require('child_process');
+    execSync('npx ts-node --transpile-only prisma/seed.ts', { cwd: '/app', timeout: 60000 });
+    res.json({ ok: true, message: 'Seed ejecutado correctamente' });
+  } catch (err: any) {
+    res.status(500).json({ error: 'Seed falló', detalle: err.message });
+  }
+});
+
 app.use(notFound);
 app.use(errorHandler);
 
