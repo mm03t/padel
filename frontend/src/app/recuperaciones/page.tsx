@@ -89,8 +89,14 @@ function RecuperacionesContent() {
   const reservar = async (sesionId: string) => {
     if (!modalRecup) return;
     setAsignando(true);
-    await api.reservar(modalRecup.id, sesionId);
-    setExito('¡Recuperación reservada! El alumno puede acudir a la sesión.');
+    const res = await api.reservar(modalRecup.id, sesionId) as any;
+    if (res?.notificacion?.enviada) {
+      setExito('¡Recuperación reservada! WhatsApp enviado al alumno.');
+    } else if (res?.notificacion?.error) {
+      setExito(`¡Recuperación reservada! No se pudo enviar WhatsApp: ${res.notificacion.error}`);
+    } else {
+      setExito('¡Recuperación reservada! El alumno puede acudir a la sesión.');
+    }
     setModalRecup(null);
     cargar();
     setAsignando(false);

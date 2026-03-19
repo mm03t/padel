@@ -1,7 +1,28 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../../lib/prisma';
+import { format } from 'date-fns';
+import { es } from 'date-fns/locale';
+import { enviarWhatsApp, mensajeRecuperacionDisponible } from '../../integrations/whatsapp';
 
 const router = Router();
+
+function toE164Spain(raw: string | null | undefined): string | null {
+  if (!raw) return null;
+
+  const trimmed = raw.trim();
+  if (!trimmed) return null;
+
+  if (trimmed.startsWith('+')) {
+    return `+${trimmed.slice(1).replace(/\D/g, '')}`;
+  }
+
+  const digits = trimmed.replace(/\D/g, '');
+  if (!digits) return null;
+
+  if (digits.startsWith('00')) return `+${digits.slice(2)}`;
+  if (digits.startsWith('34') && digits.length >= 11) return `+${digits}`;
+  return `+34${digits}`;
+}
 
 // GET /api/recuperaciones
 router.get('/', async (req: Request, res: Response) => {
@@ -109,7 +130,47 @@ router.put('/:id/reservar', async (req: Request, res: Response) => {
       },
     });
 
-    res.json({ ok: true, recuperacion });
+    // Notificación automática por WhatsApp (si Twilio está configurado)
+    let notificacion = {
+      enviada: false,
+      simulado: false,
+      error: null as string | null,
+      sid: null as string | null,
+    };
+
+    const telefono = toE164Spain(recuperacion.alumno.telefono);
+    if (telefono) {
+      const mensaje = mensajeRecuperacionDisponible({
+        nombreAlumno: recuperacion.alumno.nombre,
+        claseOrigen: recuperacion.sesionOrigen.clase.nombre,
+        claseDestino: recuperacion.sesionRecuperacion?.clase.nombre || 'Clase asignada',
+        fecha: recuperacion.sesionRecuperacion
+          ? format(new Date(recuperacion.sesionRecuperacion.fecha), "EEEE d 'de' MMMM", { locale: es })
+          : '-',
+        horaInicio: recuperacion.sesionRecuperacion?.clase.horaInicio || '-',
+      });
+
+      const envio = await enviarWhatsApp({ to: telefono, mensaje });
+      notificacion = {
+        enviada: envio.exito,
+        simulado: !!envio.simulado,
+        error: envio.error || null,
+        sid: envio.sid || null,
+      };
+
+      await prisma.notificacion.create({
+        data: {
+          alumnoId: recuperacion.alumnoId,
+          sesionId: sesionRecuperacionId,
+          tipo: 'RECUPERACION_DISPONIBLE',
+          mensaje,
+          estado: envio.exito ? 'ENVIADA' : 'FALLIDA',
+          enviadaEn: envio.exito ? new Date() : undefined,
+        },
+      });
+    }
+
+    res.json({ ok: true, recuperacion, notificacion });
   } catch (error: any) {
     res.status(500).json({ error: 'Error al reservar recuperación', detalle: error.message });
   }

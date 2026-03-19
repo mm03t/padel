@@ -12,7 +12,6 @@ import {
   Dumbbell,
   ArrowLeftRight,
   Lock,
-  MessageSquare,
   MapPin,
   Menu,
   X,
@@ -28,7 +27,6 @@ const nav = [
   { href: '/clases',         label: 'Clases',         icon: ClipboardList },
   { href: '/lista-espera',   label: 'Lista espera',   icon: ListOrdered },
   { href: '/recuperaciones', label: 'Recuperaciones', icon: RotateCcw },
-  { href: '/notificaciones', label: 'Notificaciones', icon: MessageSquare },
   { href: '/pistas',         label: 'Vista diaria',   icon: MapPin },
 ];
 
