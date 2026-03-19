@@ -6,6 +6,30 @@ import { enviarWhatsApp, mensajePlazaLibre } from '../../integrations/whatsapp';
 
 const router = Router();
 
+function toE164Spain(raw: string | null | undefined): string | null {
+  if (!raw) return null;
+
+  const trimmed = raw.trim();
+  if (!trimmed) return null;
+
+  if (trimmed.startsWith('+')) {
+    return `+${trimmed.slice(1).replace(/\D/g, '')}`;
+  }
+
+  const digits = trimmed.replace(/\D/g, '');
+  if (!digits) return null;
+
+  if (digits.startsWith('00')) {
+    return `+${digits.slice(2)}`;
+  }
+
+  if (digits.startsWith('34') && digits.length >= 11) {
+    return `+${digits}`;
+  }
+
+  return `+34${digits}`;
+}
+
 // GET /api/notificaciones
 router.get('/', async (req: Request, res: Response) => {
   try {
@@ -121,6 +145,12 @@ router.post('/enviar-lote', async (req: Request, res: Response) => {
     const notificacionesCreadas: string[] = [];
 
     for (const alumno of alumnos) {
+      const telefonoE164 = toE164Spain(alumno.telefono);
+      if (!telefonoE164) {
+        resultados.push({ alumnoId: alumno.id, exito: false });
+        continue;
+      }
+
       const mensaje = mensajePersonalizado || mensajePlazaLibre({
         nivelClase: `${sesion.clase.nivelMin}–${sesion.clase.nivelMax}`,
         diaSemana: format(sesion.fecha, 'EEEE', { locale: es }),
@@ -131,7 +161,7 @@ router.post('/enviar-lote', async (req: Request, res: Response) => {
       });
 
       const resultado = await enviarWhatsApp({
-        to: `+34${alumno.telefono}`,
+        to: telefonoE164,
         mensaje,
       });
 
@@ -166,6 +196,32 @@ router.post('/enviar-lote', async (req: Request, res: Response) => {
     });
   } catch (error: any) {
     res.status(500).json({ error: 'Error al enviar notificaciones', detalle: error.message });
+  }
+});
+
+// POST /api/notificaciones/test-whatsapp
+// Envío manual para validar Twilio Sandbox con un teléfono concreto
+router.post('/test-whatsapp', async (req: Request, res: Response) => {
+  try {
+    const { telefono, mensaje } = req.body ?? {};
+    const to = toE164Spain(telefono);
+
+    if (!to) {
+      return res.status(400).json({ error: 'telefono inválido' });
+    }
+
+    const resultado = await enviarWhatsApp({
+      to,
+      mensaje: mensaje || 'Prueba de WhatsApp desde Academia de Pádel ✅',
+    });
+
+    if (!resultado.exito) {
+      return res.status(500).json({ ok: false, error: resultado.error || 'No se pudo enviar' });
+    }
+
+    return res.json({ ok: true, to, sid: resultado.sid, simulado: !!resultado.simulado });
+  } catch (error: any) {
+    return res.status(500).json({ error: 'Error en test-whatsapp', detalle: error.message });
   }
 });
 
