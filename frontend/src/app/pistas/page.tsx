@@ -338,7 +338,7 @@ function PistasContent() {
       )}
 
       {/* Header */}
-      <div className="bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between shrink-0">
+      <div className="bg-white border-b border-slate-200 px-4 md:px-6 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shrink-0">
         <div>
           <h1 className="text-xl font-bold text-slate-800">Pistas</h1>
           <p className="text-sm text-slate-500">Vista interactiva de las 4 pistas</p>
@@ -379,7 +379,7 @@ function PistasContent() {
       <div className="flex-1 flex overflow-hidden min-h-0">
         {/* Courts grid — always 2×2, fills available space */}
         <div
-          className="flex-1 p-5 grid grid-cols-2 gap-4 min-h-0"
+          className="flex-1 p-3 md:p-5 grid grid-cols-1 sm:grid-cols-2 gap-4 min-h-0"
           style={{ gridTemplateRows: '1fr 1fr' }}
         >
           {[1, 2, 3, 4].map((numPista) => {
@@ -489,7 +489,9 @@ function PistasContent() {
 
         {/* Side panel */}
         {panel && (
-          <div className="w-80 bg-white border-l border-slate-200 flex flex-col overflow-hidden shrink-0">
+          <>
+          <div className="fixed inset-0 bg-black/30 z-30 lg:hidden" onClick={() => setPanel(null)} />
+          <div className="fixed right-0 top-0 bottom-0 w-80 z-40 lg:relative lg:z-auto bg-white border-l border-slate-200 flex flex-col overflow-hidden shrink-0">
             {/* Panel header */}
             <div className="px-4 py-4 border-b border-slate-100">
               <div className="flex items-start justify-between mb-2">
@@ -715,6 +717,7 @@ function PistasContent() {
               </div>
             </div>
           </div>
+          </>
         )}
       </div>
 

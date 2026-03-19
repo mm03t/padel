@@ -365,19 +365,19 @@ export default function CalendarioPage() {
     return `${format(d0, 'd MMM', { locale: es })} – ${format(d6, 'd MMM yyyy', { locale: es })}`;
   })();
 
-  if (loading) return <div className="p-8 flex items-center justify-center h-64"><div className="spinner" /></div>;
+  if (loading) return <div className="p-4 md:p-8 flex items-center justify-center h-64"><div className="spinner" /></div>;
 
   return (
-    <div className="flex h-full overflow-hidden">
+    <div className="flex h-full overflow-hidden relative">
       {/* ── Calendario ── */}
-      <div className="flex-1 overflow-y-auto p-6">
+      <div className="flex-1 overflow-y-auto p-3 md:p-6">
         {/* Header */}
-        <div className="flex items-center justify-between mb-5">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
           <div>
-            <h1 className="text-2xl font-black text-slate-800 capitalize">{vistaLabel}</h1>
+            <h1 className="text-xl md:text-2xl font-black text-slate-800 capitalize">{vistaLabel}</h1>
             <p className="text-sm text-slate-400 mt-0.5">{clases.length} clases activas · Haz clic en una clase para ver detalles</p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             {/* View toggle */}
             <div className="flex rounded-lg border border-slate-200 overflow-hidden mr-2">
               {([
@@ -414,7 +414,8 @@ export default function CalendarioPage() {
 
         {/* ── Vista Mes ── */}
         {vista === 'mes' && (
-        <div className="card overflow-hidden">
+        <div className="card overflow-hidden overflow-x-auto">
+          <div className="min-w-[640px]">
           <div className="grid grid-cols-7 bg-slate-50 border-b border-slate-100">
             {DIAS_HEADER.map((d) => (
               <div key={d} className="py-2.5 text-center text-xs font-bold text-slate-400 uppercase tracking-wide">{d}</div>
@@ -458,11 +459,13 @@ export default function CalendarioPage() {
             </div>
           ))}
         </div>
+        </div>
         )}
 
         {/* ── Vista Semana ── */}
         {vista === 'semana' && (
-          <div className="card overflow-hidden">
+          <div className="card overflow-hidden overflow-x-auto">
+            <div className="min-w-[640px]">
             <div className="grid grid-cols-7 bg-slate-50 border-b border-slate-100">
               {weekDays.map((d, i) => {
                 const isToday = d.toDateString() === hoy.toDateString();
@@ -502,12 +505,15 @@ export default function CalendarioPage() {
               })}
             </div>
           </div>
+          </div>
         )}
       </div>
 
       {/* ── Panel lateral ── */}
       {panel && (
-        <div className="w-80 shrink-0 border-l border-slate-100 bg-white overflow-y-auto flex flex-col shadow-sm">
+        <>
+        <div className="fixed inset-0 bg-black/30 z-30 lg:hidden" onClick={() => setPanel(null)} />
+        <div className="fixed right-0 top-0 bottom-0 w-80 z-40 lg:relative lg:z-auto shrink-0 border-l border-slate-100 bg-white overflow-y-auto flex flex-col shadow-sm">
           <div className="px-5 py-4 border-b border-slate-100 flex items-start justify-between">
             <div>
               <p className="text-xs font-bold uppercase tracking-wide mb-0.5 capitalize" style={{ color: '#1e83ec' }}>
@@ -696,6 +702,7 @@ export default function CalendarioPage() {
             </div>
           </div>
         </div>
+        </>
       )}
 
       {/* ── Modal confirmar quitar alumno ── */}

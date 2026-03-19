@@ -88,7 +88,7 @@ export default function SesionPage() {
   const faltas = Object.values(estados).filter((e) => e === 'FALTA').length;
 
   return (
-    <div className="p-8 max-w-2xl">
+    <div className="p-4 md:p-8 max-w-2xl">
       {/* Back */}
       <button onClick={() => router.back()} className="btn btn-ghost mb-5 -ml-1 text-slate-500">
         <ArrowLeft size={15} /> Volver

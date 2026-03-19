@@ -123,10 +123,10 @@ function RecuperacionesContent() {
     .sort((a, b) => DIAS_ORDER.indexOf(a.diaSemana) - DIAS_ORDER.indexOf(b.diaSemana) || a.horaInicio.localeCompare(b.horaInicio));
 
   return (
-    <div className="p-8 max-w-5xl">
-      <div className="mb-6 flex items-center justify-between">
+    <div className="p-4 md:p-8 max-w-5xl">
+      <div className="mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-black text-slate-800">Recuperaciones</h1>
+          <h1 className="text-xl md:text-2xl font-black text-slate-800">Recuperaciones</h1>
           <p className="text-sm text-slate-500 mt-0.5">Gestión de faltas y recuperaciones de clase</p>
         </div>
       </div>
@@ -197,7 +197,8 @@ function RecuperacionesContent() {
             </div>
           ) : (
             <div className="card overflow-hidden">
-              <table className="w-full text-sm">
+              <div className="overflow-x-auto">
+              <table className="w-full text-sm min-w-[600px]">
                 <thead>
                   <tr className="bg-slate-50 border-b border-slate-100">
                     <th className="text-left px-5 py-3 text-xs font-semibold text-slate-500 uppercase">Alumno</th>
@@ -254,6 +255,7 @@ function RecuperacionesContent() {
                   ))}
                 </tbody>
               </table>
+              </div>
             </div>
           )}
         </>

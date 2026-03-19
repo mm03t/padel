@@ -225,7 +225,7 @@ export default function AlumnosPage() {
     setModal((m) => ({ ...m, data: { ...m.data, [key]: e.target.value } }));
 
   return (
-    <div className="p-8 max-w-6xl">
+    <div className="p-4 md:p-8 max-w-6xl">
       {/* Toast */}
       {toast && (
         <div
@@ -241,12 +241,12 @@ export default function AlumnosPage() {
       )}
 
       {/* Header */}
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
         <div>
-          <h1 className="text-2xl font-black text-slate-800">Alumnos</h1>
+          <h1 className="text-xl md:text-2xl font-black text-slate-800">Alumnos</h1>
           <p className="text-sm text-slate-500 mt-0.5">{lista.length} alumno(s) encontrado(s)</p>
         </div>
-        <button onClick={abrirNuevo} className="btn btn-primary">
+        <button onClick={abrirNuevo} className="btn btn-primary w-full sm:w-auto justify-center">
           <UserPlus size={16} /> Nuevo alumno
         </button>
       </div>
@@ -299,8 +299,8 @@ export default function AlumnosPage() {
       ) : listaConClase.length === 0 ? (
         <div className="card p-12 text-center text-slate-400">No hay alumnos. ¡Crea el primero!</div>
       ) : (
-        <div className="card overflow-hidden">
-          <table className="w-full text-sm">
+        <div className="card overflow-hidden overflow-x-auto">
+          <table className="w-full text-sm min-w-[700px]">
             <thead>
               <tr className="bg-slate-50 border-b border-slate-100">
                 {([
@@ -411,12 +411,12 @@ export default function AlumnosPage() {
       {/* Modal */}
       {modal.open && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-          <div className="card w-full max-w-2xl max-h-[90vh] overflow-y-auto p-6">
+          <div className="card w-full max-w-2xl max-h-[90vh] overflow-y-auto p-4 md:p-6">
             <h2 className="text-lg font-black mb-5">
               {modal.editId ? 'Editar alumno' : 'Nuevo alumno'}
             </h2>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="label">Nombre</label>
                 <input className="input" value={modal.data.nombre || ''} onChange={campo('nombre')} />

@@ -303,27 +303,27 @@ export default function ClasesPage() {
     setInscribiendoEspera(false);
   };
 
-  if (loading) return <div className="p-8 flex items-center justify-center h-64"><div className="spinner" /></div>;
+  if (loading) return <div className="p-4 md:p-8 flex items-center justify-center h-64"><div className="spinner" /></div>;
 
   const totalAlumnos = new Set(clases.flatMap((c) => c.inscripciones.filter((i) => i.activo).map((i) => i.alumnoId))).size;
 
   return (
-    <div className="p-6 max-w-6xl mx-auto">
+    <div className="p-4 md:p-6 max-w-6xl mx-auto">
       {/* Header */}
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
         <div>
-          <h1 className="text-2xl font-black text-slate-800">Clases</h1>
+          <h1 className="text-xl md:text-2xl font-black text-slate-800">Clases</h1>
           <p className="text-sm text-slate-400 mt-0.5">
             {clases.length} clases activas · {totalAlumnos} alumnos inscritos
           </p>
         </div>
-        <button onClick={abrirModalNueva} className="btn btn-primary flex items-center gap-1.5">
+        <button onClick={abrirModalNueva} className="btn btn-primary flex items-center gap-1.5 w-full sm:w-auto justify-center">
           <Plus size={15} /> Nueva clase
         </button>
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-4 gap-3 mb-6">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
         <div className="card px-4 py-3">
           <p className="text-xs font-bold text-slate-400 uppercase tracking-wide">Total clases</p>
           <p className="text-2xl font-black text-slate-800 mt-0.5">{clases.length}</p>

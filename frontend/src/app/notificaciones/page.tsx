@@ -79,9 +79,9 @@ _Academia de Pádel 🎾_`
     : '';
 
   return (
-    <div className="p-8 max-w-6xl">
+    <div className="p-4 md:p-8 max-w-6xl">
       <div className="mb-6">
-        <h1 className="text-2xl font-black text-slate-800">WhatsApp · Plazas libres</h1>
+        <h1 className="text-xl md:text-2xl font-black text-slate-800">WhatsApp · Plazas libres</h1>
         <p className="text-sm text-slate-500 mt-0.5">
           Detecta plazas libres y avisa por WhatsApp solo a los alumnos compatibles
         </p>
@@ -90,7 +90,7 @@ _Academia de Pádel 🎾_`
       {/* Cómo funciona */}
       <div className="card p-5 mb-6 bg-gradient-to-r from-emerald-50 to-teal-50 border-emerald-100">
         <h3 className="font-bold text-emerald-800 mb-2 text-sm">¿Cómo funciona?</h3>
-        <div className="grid grid-cols-4 gap-4 text-xs text-emerald-700">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs text-emerald-700">
           {[
             { n: '1', t: 'Detectar', d: 'El sistema busca sesiones con plazas libres' },
             { n: '2', t: 'Filtrar', d: 'Encuentra alumnos compatibles por nivel y horario' },

@@ -14,7 +14,10 @@ import {
   Lock,
   MessageSquare,
   MapPin,
+  Menu,
+  X,
 } from 'lucide-react';
+import { useState, useEffect } from 'react';
 import { usePlan } from '@/components/PlanContext';
 import { NAV_ACCESS } from '@/lib/plans';
 
@@ -33,18 +36,22 @@ export default function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const { plan, planDef, clearPlan } = usePlan();
+  const [open, setOpen] = useState(false);
 
   const allowed = plan ? NAV_ACCESS[plan] : [];
+
+  // Close sidebar on route change (mobile)
+  useEffect(() => { setOpen(false); }, [pathname]);
 
   const cambiarPlan = () => {
     clearPlan();
     router.push('/planes');
   };
 
-  return (
-    <aside className="w-60 bg-slate-900 text-white flex flex-col shrink-0 h-full">
+  const sidebarContent = (
+    <>
       {/* Logo */}
-      <div className="px-5 py-5 border-b border-slate-700/60">
+      <div className="px-5 py-5 border-b border-slate-700/60 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div className="w-9 h-9 rounded-lg flex items-center justify-center" style={{ background: '#1e83ec' }}>
             <Dumbbell size={18} className="text-white" strokeWidth={2.5} />
@@ -54,6 +61,9 @@ export default function Sidebar() {
             <p className="text-xs text-slate-400">Panel de gestión</p>
           </div>
         </div>
+        <button onClick={() => setOpen(false)} className="lg:hidden text-slate-400 hover:text-white p-1">
+          <X size={20} />
+        </button>
       </div>
 
       {/* Plan badge */}
@@ -112,6 +122,34 @@ export default function Sidebar() {
       <div className="px-5 py-4 border-t border-slate-700/60">
         <p className="text-xs text-slate-500">SaaS Demo · 2026</p>
       </div>
-    </aside>
+    </>
+  );
+
+  return (
+    <>
+      {/* Mobile hamburger button */}
+      <button
+        onClick={() => setOpen(true)}
+        className="lg:hidden fixed top-3 left-3 z-50 p-2 rounded-lg bg-slate-900 text-white shadow-lg"
+        aria-label="Abrir menú"
+      >
+        <Menu size={20} />
+      </button>
+
+      {/* Mobile overlay */}
+      {open && (
+        <div className="lg:hidden fixed inset-0 z-40 bg-black/50 backdrop-blur-sm" onClick={() => setOpen(false)} />
+      )}
+
+      {/* Sidebar — mobile: slide-in overlay, desktop: fixed column */}
+      <aside className={`
+        fixed lg:relative z-50 lg:z-auto
+        w-64 lg:w-60 bg-slate-900 text-white flex flex-col shrink-0 h-full
+        transition-transform duration-200 ease-in-out
+        ${open ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
+      `}>
+        {sidebarContent}
+      </aside>
+    </>
   );
 }

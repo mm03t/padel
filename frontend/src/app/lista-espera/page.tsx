@@ -86,7 +86,7 @@ export default function ListaEsperaPage() {
       )}
 
       {/* Header */}
-      <div className="bg-white border-b border-slate-200 px-6 py-4 shrink-0">
+      <div className="bg-white border-b border-slate-200 px-4 md:px-6 py-4 shrink-0">
         <div>
           <h1 className="text-xl font-bold text-slate-800">Lista de Espera</h1>
           <p className="text-sm text-slate-500 flex items-center gap-2">
@@ -101,7 +101,7 @@ export default function ListaEsperaPage() {
       </div>
 
       {/* Lista sin plaza */}
-      <div className="flex-1 overflow-auto p-6">
+      <div className="flex-1 overflow-auto p-4 md:p-6">
         {cargandoSinPlaza ? (
           <div className="flex items-center justify-center py-20">
             <Loader2 size={28} className="animate-spin text-slate-300" />
@@ -115,7 +115,7 @@ export default function ListaEsperaPage() {
         ) : (
           <div className="grid gap-3 max-w-4xl">
             {alumnosSinPlaza.map((a, idx) => (
-              <div key={a.id} className="bg-white rounded-xl border border-slate-200 p-4 flex items-start gap-4 hover:shadow-sm transition-shadow">
+              <div key={a.id} className="bg-white rounded-xl border border-slate-200 p-4 flex flex-col sm:flex-row sm:items-start gap-3 sm:gap-4 hover:shadow-sm transition-shadow">
                 {/* Posición en cola */}
                 <div
                   className="w-9 h-9 rounded-full flex items-center justify-center text-sm font-black shrink-0 mt-0.5"
@@ -186,7 +186,7 @@ export default function ListaEsperaPage() {
 
                 {/* Botones asignar + borrar */}
                 {asignandoId !== a.id && (
-                  <div className="flex items-center gap-1 shrink-0">
+                  <div className="flex items-center gap-1 shrink-0 self-end sm:self-auto">
                     <button
                       onClick={() => iniciarAsignacion(a)}
                       className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-white"

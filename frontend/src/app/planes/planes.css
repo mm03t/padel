@@ -4,7 +4,13 @@
   position: relative;
   min-height: 100vh;
   overflow-x: hidden;
-  padding: 3rem 1.5rem 4rem;
+  padding: 1.5rem 1rem 3rem;
+}
+
+@media (min-width: 640px) {
+  .planes-page {
+    padding: 3rem 1.5rem 4rem;
+  }
 }
 
 .planes-bg {
@@ -49,12 +55,18 @@
 }
 
 .planes-title {
-  font-size: 2.25rem;
+  font-size: 1.5rem;
   font-weight: 900;
   color: #0f172a;
   letter-spacing: -0.03em;
   line-height: 1.15;
   margin-bottom: 0.75rem;
+}
+
+@media (min-width: 640px) {
+  .planes-title {
+    font-size: 2.25rem;
+  }
 }
 
 .planes-subtitle {

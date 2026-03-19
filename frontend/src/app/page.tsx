@@ -25,7 +25,7 @@ function StatCard({
       <div className="flex items-start justify-between">
         <div>
           <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">{label}</p>
-          <p className={`text-4xl font-black mt-1 ${color}`}>{value}</p>
+          <p className={`text-2xl md:text-4xl font-black mt-1 ${color}`}>{value}</p>
           {sub && <p className="text-xs text-slate-400 mt-0.5">{sub}</p>}
         </div>
         <div className={`p-3 rounded-xl ${color === 'text-emerald-600' ? 'bg-emerald-50' : color === 'text-blue-600' ? 'bg-blue-50' : color === 'text-amber-600' ? 'bg-amber-50' : 'bg-rose-50'}`}>
@@ -97,7 +97,7 @@ export default function DashboardPage() {
 
   if (error) {
     return (
-      <div className="p-8">
+      <div className="p-4 md:p-8">
         <div className="card p-6 border-rose-200 bg-rose-50 text-rose-700">
           <p className="font-semibold">No se pudo conectar con la API</p>
           <p className="text-sm mt-1">{error}</p>
@@ -109,7 +109,7 @@ export default function DashboardPage() {
 
   if (!stats) {
     return (
-      <div className="p-8 flex items-center justify-center h-64">
+      <div className="p-4 md:p-8 flex items-center justify-center h-64">
         <div className="spinner" />
       </div>
     );
@@ -134,7 +134,7 @@ export default function DashboardPage() {
   /* ── STARTER ──────────────────────────────────────────────────────────────── */
   if (plan === 'starter') {
     return (
-      <div className="p-8 max-w-4xl">
+      <div className="p-4 md:p-8 max-w-4xl">
         <div className="mb-8">
           <h1 className="text-2xl font-black text-slate-800">Dashboard</h1>
           <p className="text-slate-500 text-sm mt-1">
@@ -212,7 +212,7 @@ export default function DashboardPage() {
   /* ── CLUB ──────────────────────────────────────────────────────────────────── */
   if (plan === 'club') {
     return (
-      <div className="p-8 max-w-6xl">
+      <div className="p-4 md:p-8 max-w-6xl">
         <div className="mb-8">
           <h1 className="text-2xl font-black text-slate-800">Dashboard</h1>
           <p className="text-slate-500 text-sm mt-1">
@@ -232,7 +232,7 @@ export default function DashboardPage() {
         )}
 
         {/* Stats grid: 3 cards */}
-        <div className="grid grid-cols-3 gap-4 mb-8">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
           <StatCard label="Alumnos activos" value={stats.totalAlumnos} icon={Users} color="text-emerald-600" />
           <StatCard label="Clases activas" value={stats.totalClases} icon={CalendarDays} color="text-blue-600" />
           <StatCard label="Recuperaciones pendientes" value={stats.recuperacionesPendientes} icon={RotateCcw} color="text-amber-600"
@@ -364,7 +364,7 @@ export default function DashboardPage() {
   const maxMrr = Math.max(...mrrTrend, 1);
 
   return (
-    <div className="p-8 max-w-7xl">
+    <div className="p-4 md:p-8 max-w-7xl">
       <div className="mb-8 flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-black text-slate-800">Dashboard</h1>
@@ -437,7 +437,7 @@ export default function DashboardPage() {
       </div>
 
       {/* ── ROW 2: Activity strip ─────────────────────────────────────────────── */}
-      <div className="card grid grid-cols-2 md:grid-cols-5 divide-x divide-slate-100 mb-6">
+      <div className="card grid grid-cols-2 md:grid-cols-5 divide-y md:divide-y-0 md:divide-x divide-slate-100 mb-6">
         <MiniKPI label="Clases activas" value={String(stats.totalClases)} icon={CalendarDays} iconColor="#1e83ec" />
         <MiniKPI label="Sesiones/semana" value={String(sesionesSemanales)} icon={Calendar} iconColor="#8b5cf6" />
         <MiniKPI label="Recup. pendientes" value={String(stats.recuperacionesPendientes)} trend={stats.vencenPronto > 0 ? `${stats.vencenPronto} urgen` : undefined} trendUp={false} icon={RotateCcw} iconColor="#f59e0b" />
