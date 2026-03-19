@@ -88,6 +88,10 @@ function RecuperacionesContent() {
 
   const reservar = async (sesionId: string) => {
     if (!modalRecup) return;
+
+    const confirmar = confirm('¿Asignar clase pendiente y mandar notificación por WhatsApp?');
+    if (!confirmar) return;
+
     setAsignando(true);
     const res = await api.reservar(modalRecup.id, sesionId) as any;
     if (res?.notificacion?.enviada) {
