@@ -92,6 +92,7 @@ export interface Asistencia {
   alumnoId: string;
   estado: EstadoAsistencia;
   alumno: Alumno;
+  sesion?: { id: string; claseId: string; fecha: string; estado: string; clase?: { nombre: string } };
 }
 
 export interface Recuperacion {
