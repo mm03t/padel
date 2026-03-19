@@ -4,6 +4,5 @@ COPY package*.json ./
 RUN npm install
 COPY . .
 RUN npx prisma generate
-RUN npm run build
 EXPOSE 3003
-CMD ["npm", "run", "start"]
+CMD ["npx", "ts-node", "--transpile-only", "src/server.ts"]
