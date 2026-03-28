@@ -12,12 +12,14 @@ import dashboardRouter from './modules/dashboard/dashboard.router';
 import pagosRouter from './modules/pagos/pagos.router';
 import listaEsperaRouter from './modules/lista-espera/lista-espera.router';
 import solicitudesEsperaRouter from './modules/solicitudes-espera/solicitudes-espera.router';
+import whatsappRouter from './modules/whatsapp/whatsapp.router';
 
 const app = express();
 const PORT = process.env.PORT || 3003;
 
 app.use(cors({ origin: '*' }));
 app.use(express.json());
+app.use(express.urlencoded({ extended: false })); // necesario para Twilio webhooks
 
 // Rutas de la API
 app.use('/api/auth', authRouter);
@@ -31,6 +33,7 @@ app.use('/api/dashboard', dashboardRouter);
 app.use('/api/pagos', pagosRouter);
 app.use('/api/lista-espera', listaEsperaRouter);
 app.use('/api/solicitudes-espera', solicitudesEsperaRouter);
+app.use('/api/whatsapp', whatsappRouter);
 
 app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', app: 'Academia Pádel API', ts: new Date().toISOString() });

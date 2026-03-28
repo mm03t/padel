@@ -71,20 +71,20 @@ export function mensajeRecuperacionDisponible(params: {
   nombreAlumno: string;
   claseOrigen: string;
   claseDestino: string;
-  fecha: string;
-  horaInicio: string;
+  fecha: string;        // "Martes 31 de marzo"
+  horaInicio: string;   // "18:00"
+  diaContexto?: string; // " (hoy)" | " (mañana)" | " (el martes)" | ""
 }): string {
-  return `🔄 *Recuperación disponible*
+  const contexto = params.diaContexto ?? '';
+  return `Hola ${params.nombreAlumno},
 
-Hola ${params.nombreAlumno},
+Tienes una clase pendiente de ${params.claseOrigen}${contexto}.
 
-Tienes una falta pendiente de *${params.claseOrigen}*.
+Recuperación:
+📅 ${params.fecha}
+🕕 ${params.horaInicio} (${params.claseDestino})
 
-Puedes recuperarla en:
-📅 ${params.claseDestino}
-🗓️ ${params.fecha} a las ${params.horaInicio}
+Responde *SI* para confirmar.
 
-¿Confirmas la recuperación? Responde *SI*.
-
-_Academia de Pádel 🎾_`;
+Academia de Pádel 🎾`;
 }

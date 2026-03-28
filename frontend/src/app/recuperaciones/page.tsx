@@ -3,21 +3,26 @@
 import { useEffect, useState } from 'react';
 import { format, differenceInDays } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { RotateCcw, X, Calendar, CheckCircle } from 'lucide-react';
-import { recuperaciones as api, clases as apiClases } from '@/lib/api';
-import type { Recuperacion, Sesion, EstadoRecuperacion, Clase } from '@/types';
+import { RotateCcw, X, Calendar, Users, MessageCircle, CheckCircle2 } from 'lucide-react';
+import { recuperaciones as api } from '@/lib/api';
+import type { Recuperacion, Sesion, EstadoRecuperacion, ClaseParaRecuperar } from '@/types';
 import UpgradeGate from '@/components/UpgradeGate';
 
 const ESTADO_BADGE: Record<EstadoRecuperacion, string> = {
-  PENDIENTE: 'badge-yellow',
-  RESERVADA: 'badge-blue',
-  COMPLETADA: 'badge-green',
-  VENCIDA: 'badge-gray',
-  CANCELADA: 'badge-red',
+  PENDIENTE:   'badge-yellow',
+  RESERVADA:   'badge-blue',
+  CONFIRMADA:  'badge-sky',
+  COMPLETADA:  'badge-green',
+  VENCIDA:     'badge-gray',
+  CANCELADA:   'badge-red',
 };
 const ESTADO_LABEL: Record<EstadoRecuperacion, string> = {
-  PENDIENTE: 'Pendiente', RESERVADA: 'Reservada',
-  COMPLETADA: 'Completada', VENCIDA: 'Vencida', CANCELADA: 'Cancelada',
+  PENDIENTE:  'Pendiente',
+  RESERVADA:  'Reservada',
+  CONFIRMADA: 'Confirmada ✅',
+  COMPLETADA: 'Completada',
+  VENCIDA:    'Vencida',
+  CANCELADA:  'Cancelada',
 };
 
 const DIAS_ORDER = ['LUNES', 'MARTES', 'MIERCOLES', 'JUEVES', 'VIERNES', 'SABADO', 'DOMINGO'];
@@ -56,10 +61,19 @@ function RecuperacionesContent() {
   const [exito, setExito] = useState('');
 
   // ── tab clases disponibles ────────────────────────────────────────────────
-  const [clasesDisp, setClasesDisp] = useState<Clase[]>([]);
+  const [clasesDisp, setClasesDisp] = useState<ClaseParaRecuperar[]>([]);
   const [loadingClases, setLoadingClases] = useState(false);
-  const [filtroNivel, setFiltroNivel] = useState<string>('');
   const [filtroDia, setFiltroDia] = useState<string>('');
+  const [asignandoCandidato, setAsignandoCandidato] = useState<string | null>(null);
+
+  // ── modal de confirmación ───────────────────────────────────────────────
+  const [confirm, setConfirm] = useState<{
+    titulo: string;
+    alumno: string;
+    clase: string;
+    telefono?: string;
+    onConfirm: () => void;
+  } | null>(null);
 
   const cargar = () => {
     setLoading(true);
@@ -70,7 +84,7 @@ function RecuperacionesContent() {
 
   const cargarClasesDisp = () => {
     setLoadingClases(true);
-    apiClases.list({ activa: 'true' })
+    api.clasesDisponibles()
       .then(setClasesDisp)
       .finally(() => setLoadingClases(false));
   };
@@ -88,23 +102,30 @@ function RecuperacionesContent() {
 
   const reservar = async (sesionId: string) => {
     if (!modalRecup) return;
-
-    const confirmar = confirm('¿Asignar clase pendiente y mandar notificación por WhatsApp?');
-    if (!confirmar) return;
-
-    setAsignando(true);
-    const res = await api.reservar(modalRecup.id, sesionId) as any;
-    if (res?.notificacion?.enviada) {
-      setExito('¡Recuperación reservada! WhatsApp enviado al alumno.');
-    } else if (res?.notificacion?.error) {
-      setExito(`¡Recuperación reservada! No se pudo enviar WhatsApp: ${res.notificacion.error}`);
-    } else {
-      setExito('¡Recuperación reservada! El alumno puede acudir a la sesión.');
-    }
-    setModalRecup(null);
-    cargar();
-    setAsignando(false);
-    setTimeout(() => setExito(''), 4000);
+    const s = sesionesDisp.find((x) => x.id === sesionId);
+    setConfirm({
+      titulo: 'Confirmar recuperación',
+      alumno: `${modalRecup.alumno.nombre} ${modalRecup.alumno.apellidos}`,
+      clase: s ? `${s.clase.nombre} · ${format(new Date(s.fecha), "EEEE d 'de' MMMM · HH:mm", { locale: es })}` : 'Clase asignada',
+      telefono: modalRecup.alumno.telefono ?? undefined,
+      onConfirm: async () => {
+        setConfirm(null);
+        setAsignando(true);
+        const res = await api.reservar(modalRecup.id, sesionId) as any;
+        if (res?.notificacion?.enviada) {
+          setExito('¡Recuperación reservada! WhatsApp enviado al alumno.');
+        } else if (res?.notificacion?.error) {
+          setExito(`¡Recuperación reservada! No se pudo enviar WhatsApp: ${res.notificacion.error}`);
+        } else {
+          setExito('¡Recuperación reservada! El alumno puede acudir a la sesión.');
+        }
+        setModalRecup(null);
+        cargar();
+        if (tab === 'disponibles') cargarClasesDisp();
+        setAsignando(false);
+        setTimeout(() => setExito(''), 4000);
+      },
+    });
   };
 
   const cancelar = async (id: string) => {
@@ -113,23 +134,40 @@ function RecuperacionesContent() {
     cargar();
   };
 
+  const asignarDesdeClase = (recuperacionId: string, claseId: string, claseNombre: string, alumnoNombre: string, telefono?: string) => {
+    setConfirm({
+      titulo: 'Confirmar recuperación',
+      alumno: alumnoNombre,
+      clase: claseNombre,
+      telefono,
+      onConfirm: async () => {
+        setConfirm(null);
+        setAsignandoCandidato(recuperacionId);
+        try {
+          const res = await api.reservarDesdeClase(recuperacionId, claseId) as any;
+          if (res?.notificacion?.enviada) {
+            setExito('¡Recuperación asignada! WhatsApp enviado al alumno.');
+          } else {
+            setExito('¡Recuperación asignada! El alumno puede acudir a la clase.');
+          }
+          cargar();
+          cargarClasesDisp();
+          setTimeout(() => setExito(''), 4000);
+        } finally {
+          setAsignandoCandidato(null);
+        }
+      },
+    });
+  };
+
   const pendientes = lista.filter((r) => r.estado === 'PENDIENTE').length;
   const vencenPronto = lista.filter(
     (r) => r.estado === 'PENDIENTE' && differenceInDays(new Date(r.expiraEn), new Date()) <= 7,
   ).length;
 
   // Clases disponibles filtradas
-  const niveles = [...new Set(clasesDisp.map((c) => `${c.nivelMin}-${c.nivelMax}`))].sort();
   const clasesFiltradas = clasesDisp
-    .filter((c) => {
-      const rango = `${c.nivelMin}-${c.nivelMax}`;
-      const inscritos = c.inscripciones?.filter((i: any) => i.activo).length ?? 0;
-      const tieneHueco = inscritos < c.plazasTotal;
-      if (!tieneHueco) return false;
-      if (filtroNivel && rango !== filtroNivel) return false;
-      if (filtroDia && c.diaSemana !== filtroDia) return false;
-      return true;
-    })
+    .filter((c) => !filtroDia || c.diaSemana === filtroDia)
     .sort((a, b) => DIAS_ORDER.indexOf(a.diaSemana) - DIAS_ORDER.indexOf(b.diaSemana) || a.horaInicio.localeCompare(b.horaInicio));
 
   return (
@@ -274,37 +312,23 @@ function RecuperacionesContent() {
       {/* ── TAB: Clases disponibles ──────────────────────────────────────────── */}
       {tab === 'disponibles' && (
         <>
-          <div className="flex flex-wrap gap-3 mb-5 items-center">
-            <p className="text-sm text-slate-500 mr-2">Filtrar:</p>
-            {/* Filtro día */}
-            <div className="flex gap-1">
+          <div className="flex flex-wrap gap-2 mb-5 items-center">
+            <p className="text-sm text-slate-500 mr-1">Día:</p>
+            <button
+              onClick={() => setFiltroDia('')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${filtroDia === '' ? 'border-[#1e83ec] bg-blue-50 text-[#1e83ec]' : 'border-slate-200 text-slate-500 hover:border-slate-300'}`}
+            >
+              Todos
+            </button>
+            {DIAS_ORDER.slice(0, 5).map((d) => (
               <button
-                onClick={() => setFiltroDia('')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${filtroDia === '' ? 'border-[#1e83ec] bg-blue-50 text-[#1e83ec]' : 'border-slate-200 text-slate-500 hover:border-slate-300'}`}
+                key={d}
+                onClick={() => setFiltroDia(filtroDia === d ? '' : d)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${filtroDia === d ? 'border-[#1e83ec] bg-blue-50 text-[#1e83ec]' : 'border-slate-200 text-slate-500 hover:border-slate-300'}`}
               >
-                Todos los días
+                {DIA_LABEL[d]}
               </button>
-              {DIAS_ORDER.slice(0, 5).map((d) => (
-                <button
-                  key={d}
-                  onClick={() => setFiltroDia(filtroDia === d ? '' : d)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${filtroDia === d ? 'border-[#1e83ec] bg-blue-50 text-[#1e83ec]' : 'border-slate-200 text-slate-500 hover:border-slate-300'}`}
-                >
-                  {DIA_LABEL[d]}
-                </button>
-              ))}
-            </div>
-            {/* Filtro nivel */}
-            {niveles.length > 0 && (
-              <select
-                className="input text-sm py-1.5 w-auto"
-                value={filtroNivel}
-                onChange={(e) => setFiltroNivel(e.target.value)}
-              >
-                <option value="">Todos los niveles</option>
-                {niveles.map((n) => <option key={n} value={n}>Nivel {n}</option>)}
-              </select>
-            )}
+            ))}
           </div>
 
           {loadingClases ? (
@@ -312,61 +336,81 @@ function RecuperacionesContent() {
           ) : clasesFiltradas.length === 0 ? (
             <div className="card p-12 text-center text-slate-400">
               <Calendar size={32} className="mx-auto mb-3 opacity-20" />
-              No hay clases con plazas libres con estos filtros.
+              No hay clases con plazas libres.
             </div>
           ) : (
-            <div className="grid grid-cols-1 gap-3">
-              {/* Agrupar por día */}
+            <div className="space-y-6">
               {DIAS_ORDER.filter((d) => clasesFiltradas.some((c) => c.diaSemana === d)).map((dia) => (
                 <div key={dia}>
-                  <p className="text-xs font-bold text-slate-400 uppercase tracking-wide mb-2 mt-2">
+                  <p className="text-xs font-bold text-slate-400 uppercase tracking-wide mb-3">
                     {dia.charAt(0) + dia.slice(1).toLowerCase()}
                   </p>
-                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-                    {clasesFiltradas.filter((c) => c.diaSemana === dia).map((c) => {
-                      const inscritos = c.inscripciones?.filter((i: any) => i.activo).length ?? 0;
-                      const libres = c.plazasTotal - inscritos;
-                      return (
-                        <div key={c.id} className="card p-4 hover:shadow-md transition-shadow">
-                          <div className="flex items-start justify-between mb-2">
-                            <div>
-                              <p className="font-bold text-slate-800 text-sm leading-tight">{c.nombre}</p>
-                              <p className="text-xs text-slate-500 mt-0.5">{c.horaInicio} – {c.horaFin}</p>
-                            </div>
-                            <span className="shrink-0 ml-2 px-2 py-0.5 rounded-full text-[10px] font-bold text-white bg-emerald-500">
-                              {libres} libre{libres > 1 ? 's' : ''}
-                            </span>
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    {clasesFiltradas.filter((c) => c.diaSemana === dia).map((c) => (
+                      <div key={c.id} className="card p-4">
+                        {/* Cabecera clase */}
+                        <div className="flex items-start justify-between mb-3">
+                          <div>
+                            <p className="font-bold text-slate-800">{c.nombre}</p>
+                            <p className="text-xs text-slate-500 mt-0.5">
+                              {c.horaInicio} – {c.horaFin} · Pista {c.pista?.numero} · Niv. {c.nivelMin}–{c.nivelMax}
+                            </p>
+                            <p className="text-xs text-slate-400">{c.profesor?.nombre} {c.profesor?.apellidos}</p>
                           </div>
-                          <div className="flex items-center gap-1 mb-2">
-                            {Array.from({ length: c.plazasTotal }).map((_, i) => (
-                              <span
-                                key={i}
-                                className={`inline-block h-2 rounded-full flex-1 ${i < inscritos ? 'bg-slate-200' : 'bg-emerald-400'}`}
-                              />
-                            ))}
-                          </div>
-                          <p className="text-xs text-slate-400">
-                            Pista {c.pista?.numero} · {c.profesor?.nombre} {c.profesor?.apellidos}
-                          </p>
-                          <p className="text-xs text-slate-400 mt-0.5">
-                            Niv. {c.nivelMin}–{c.nivelMax}
-                          </p>
-                          {/* Recuperaciones pendientes compatibles */}
-                          {pendientes > 0 && (
-                            <div className="mt-2 pt-2 border-t border-slate-100">
-                              <p className="text-[10px] text-slate-400 flex items-center gap-1">
-                                <CheckCircle size={10} className="text-emerald-500" />
-                                {lista.filter((r) =>
-                                  r.estado === 'PENDIENTE' &&
-                                  r.alumno.nivel >= c.nivelMin - 0.5 &&
-                                  r.alumno.nivel <= c.nivelMax + 0.5
-                                ).length} recuperación(es) compatibles
-                              </p>
-                            </div>
-                          )}
+                          <span className={`shrink-0 ml-2 px-2 py-0.5 rounded-full text-[10px] font-bold text-white ${c.plazasLibres === 1 ? 'bg-amber-500' : 'bg-emerald-500'}`}>
+                            {c.plazasLibres} libre{c.plazasLibres > 1 ? 's' : ''}
+                          </span>
                         </div>
-                      );
-                    })}
+
+                        {/* Barra de ocupación */}
+                        <div className="flex items-center gap-1 mb-3">
+                          {Array.from({ length: c.plazasTotal }).map((_, i) => (
+                            <span
+                              key={i}
+                              className={`inline-block h-1.5 rounded-full flex-1 ${i < (c.plazasTotal - c.plazasLibres) ? 'bg-slate-200' : 'bg-emerald-400'}`}
+                            />
+                          ))}
+                        </div>
+
+                        {/* Candidatos para recuperar */}
+                        {c.candidatos.length === 0 ? (
+                          <p className="text-[11px] text-slate-400 italic">Sin alumnos pendientes compatibles</p>
+                        ) : (
+                          <div>
+                            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wide mb-2 flex items-center gap-1">
+                              <Users size={10} />
+                              {c.candidatos.length} alumno{c.candidatos.length > 1 ? 's' : ''} puede{c.candidatos.length > 1 ? 'n' : ''} recuperar aquí
+                            </p>
+                            <div className="space-y-1.5">
+                              {c.candidatos.map((cand) => (
+                                <div key={cand.alumnoId} className="flex items-center justify-between bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
+                                  <div>
+                                    <p className="text-xs font-semibold text-slate-800">
+                                      {cand.nombre} {cand.apellidos}
+                                    </p>
+                                    <p className="text-[10px] text-slate-500">
+                                      Niv. {cand.nivel.toFixed(1)}
+                                      {cand.totalPendientes > 1 && (
+                                        <span className="ml-1.5 text-amber-700 font-semibold">
+                                          · {cand.totalPendientes} pendientes
+                                        </span>
+                                      )}
+                                    </p>
+                                  </div>
+                                  <button
+                                    onClick={() => asignarDesdeClase(cand.recuperacionId, c.id, c.nombre, `${cand.nombre} ${cand.apellidos}`, cand.telefono)}
+                                    disabled={asignandoCandidato === cand.recuperacionId}
+                                    className="shrink-0 ml-2 px-3 py-1.5 rounded-lg text-[11px] font-bold bg-sky-600 hover:bg-sky-700 text-white transition-colors disabled:opacity-50"
+                                  >
+                                    {asignandoCandidato === cand.recuperacionId ? '...' : 'Asignar'}
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ))}
                   </div>
                 </div>
               ))}
@@ -426,6 +470,60 @@ function RecuperacionesContent() {
                 ))}
               </div>
             )}
+          </div>
+        </div>
+      )}
+      {/* Modal de confirmación */}
+      {confirm && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <div className="card w-full max-w-sm p-6 shadow-2xl">
+            <div className="flex items-start gap-3 mb-5">
+              <div className="w-10 h-10 rounded-xl bg-sky-50 flex items-center justify-center shrink-0">
+                <CheckCircle2 size={20} className="text-sky-600" />
+              </div>
+              <div>
+                <h3 className="font-black text-slate-800 text-base leading-tight">{confirm.titulo}</h3>
+                <p className="text-sm text-slate-500 mt-0.5">Revisa los datos antes de confirmar</p>
+              </div>
+            </div>
+
+            <div className="bg-slate-50 rounded-xl p-4 space-y-2 mb-4">
+              <div className="flex justify-between text-sm">
+                <span className="text-slate-400 font-medium">Alumno</span>
+                <span className="font-bold text-slate-800">{confirm.alumno}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-slate-400 font-medium">Clase</span>
+                <span className="font-bold text-slate-800 text-right max-w-[60%]">{confirm.clase}</span>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-2.5 bg-green-50 border border-green-100 rounded-xl px-4 py-3 mb-6">
+              <MessageCircle size={15} className="text-green-600 shrink-0 mt-0.5" />
+              <div>
+                <p className="text-xs font-bold text-green-800">Se enviará un WhatsApp al alumno</p>
+                {confirm.telefono ? (
+                  <p className="text-[11px] text-green-700 mt-0.5">Al número {confirm.telefono} con los detalles de la recuperación</p>
+                ) : (
+                  <p className="text-[11px] text-amber-700 mt-0.5 font-semibold">⚠️ El alumno no tiene teléfono registrado — no se enviará mensaje</p>
+                )}
+              </div>
+            </div>
+
+            <div className="flex gap-2">
+              <button
+                onClick={() => setConfirm(null)}
+                className="flex-1 btn btn-secondary"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={confirm.onConfirm}
+                className="flex-1 btn btn-primary"
+              >
+                Confirmar asignación
+              </button>
+            </div>
           </div>
         </div>
       )}

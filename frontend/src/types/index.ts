@@ -4,7 +4,7 @@ export type Disponibilidad = 'MANANA' | 'TARDE' | 'FLEXIBLE';
 export type DiaSemana = 'LUNES' | 'MARTES' | 'MIERCOLES' | 'JUEVES' | 'VIERNES' | 'SABADO' | 'DOMINGO';
 export type EstadoSesion = 'PROGRAMADA' | 'EN_CURSO' | 'COMPLETADA' | 'CANCELADA';
 export type EstadoAsistencia = 'PRESENTE' | 'FALTA' | 'RECUPERACION' | 'JUSTIFICADA';
-export type EstadoRecuperacion = 'PENDIENTE' | 'RESERVADA' | 'COMPLETADA' | 'VENCIDA' | 'CANCELADA';
+export type EstadoRecuperacion = 'PENDIENTE' | 'RESERVADA' | 'CONFIRMADA' | 'COMPLETADA' | 'VENCIDA' | 'CANCELADA';
 export type EstadoNotificacion = 'PENDIENTE' | 'ENVIADA' | 'FALLIDA' | 'LEIDA';
 export type TipoNotificacion = 'PLAZA_LIBRE' | 'RECUPERACION_DISPONIBLE' | 'RECORDATORIO';
 export type EstadoPago = 'PAGADO' | 'PENDIENTE' | 'VENCIDO';
@@ -224,4 +224,28 @@ export interface CandidatosHueco {
   compatibles: CandidatoHueco[];
   otros: CandidatoHueco[];
   clase: { nombre: string; nivelMin: number; nivelMax: number };
+}
+export interface CandidatoRecuperacion {
+  recuperacionId: string;
+  alumnoId: string;
+  nombre: string;
+  apellidos: string;
+  nivel: number;
+  telefono: string;
+  totalPendientes: number;
+}
+
+export interface ClaseParaRecuperar {
+  id: string;
+  nombre: string;
+  diaSemana: string;
+  horaInicio: string;
+  horaFin: string;
+  nivelMin: number;
+  nivelMax: number;
+  plazasTotal: number;
+  plazasLibres: number;
+  profesor: { nombre: string; apellidos: string };
+  pista: { numero: number };
+  candidatos: CandidatoRecuperacion[];
 }

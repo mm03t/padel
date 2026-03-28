@@ -118,6 +118,11 @@ export const recuperaciones = {
       method: 'PUT',
       body: JSON.stringify({ sesionRecuperacionId }),
     }),
+  reservarDesdeClase: (id: string, claseId: string) =>
+    req(`/recuperaciones/${id}/reservar-desde-clase`, {
+      method: 'PUT',
+      body: JSON.stringify({ claseId }),
+    }),
   cancelar: (id: string) =>
     req(`/recuperaciones/${id}/cancelar`, { method: 'PUT' }),
   faltaAnticipada: (claseId: string, alumnoId: string, fecha: string) =>
@@ -125,8 +130,10 @@ export const recuperaciones = {
       '/recuperaciones/falta-anticipada',
       { method: 'POST', body: JSON.stringify({ claseId, alumnoId, fecha }) },
     ),
-  candidatos: (claseId: string) =>
-    req<import('@/types').CandidatosHueco>(`/recuperaciones/candidatos?claseId=${claseId}`),
+    candidatos: (claseId: string) =>
+      req<import('@/types').CandidatosHueco>(`/recuperaciones/candidatos?claseId=${claseId}`),
+    clasesDisponibles: () =>
+      req<import('@/types').ClaseParaRecuperar[]>('/recuperaciones/clases-disponibles'),
 };
 
 // ─────────────────────────────────────────

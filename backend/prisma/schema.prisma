@@ -231,6 +231,7 @@ enum EstadoAsistencia {
 enum EstadoRecuperacion {
   PENDIENTE
   RESERVADA
+  CONFIRMADA
   COMPLETADA
   VENCIDA
   CANCELADA
